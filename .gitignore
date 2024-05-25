@@ -22,10 +22,10 @@ yarn-error.log*
 *.sln
 *.sw?
 
-/server/log/
-/server/gva
-/server/latest_log
-/server/__debug_bin*
+/cdn-drilling-server/log/
+/cdn-drilling-server/gva
+/cdn-drilling-server/latest_log
+/cdn-drilling-server/__debug_bin*
 
 *.iml
 web/.pnpm-debug.log
