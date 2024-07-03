@@ -55,6 +55,18 @@ func (asnInfoService *AsnInfoService) GetAsnInfoInfoList(info cfscanReq.AsnInfoS
 	if info.StartCreatedAt != nil && info.EndCreatedAt != nil {
 		db = db.Where("created_at BETWEEN ? AND ?", info.StartCreatedAt, info.EndCreatedAt)
 	}
+	//模糊查询
+	if info.AsnName != "" {
+		db = db.Where("asn_name LIKE ?", "%"+info.AsnName+"%")
+	}
+	if info.FullName != "" {
+		db = db.Where("full_name LIKE ?", "%"+info.FullName+"%")
+	}
+	if info.AllocationCountry != "" {
+		db = db.Where("allocation_country LIKE ?", "%"+info.AllocationCountry+"%")
+
+	}
+
 	err = db.Count(&total).Error
 	if err != nil {
 		return

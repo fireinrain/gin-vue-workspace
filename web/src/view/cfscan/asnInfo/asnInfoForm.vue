@@ -115,11 +115,6 @@ const rule = reactive({
                    message: '',
                    trigger: ['input','blur'],
                }],
-               fullName : [{
-                   required: true,
-                   message: '',
-                   trigger: ['input','blur'],
-               }],
                enable : [{
                    required: true,
                    message: '',

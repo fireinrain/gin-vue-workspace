@@ -10,7 +10,7 @@ import (
 type AsnInfo struct {
 	global.GVA_MODEL
 	AsnName           string     `json:"asnName" form:"asnName" gorm:"uniqueIndex;column:asn_name;comment:ASN名称;" binding:"required"` //ASN名称
-	FullName          string     `json:"fullName" form:"fullName" gorm:"column:full_name;comment:ASN全名;" binding:"required"`          //ASN全名
+	FullName          string     `json:"fullName" form:"fullName" gorm:"column:full_name;comment:ASN全名;"`                             //ASN全名
 	Ipv4Counts        *int       `json:"ipv4Counts" form:"ipv4Counts" gorm:"column:ipv4_counts;comment:IPV4数量;"`                      //IPV4数量
 	Ipv6Counts        *int       `json:"ipv6Counts" form:"ipv6Counts" gorm:"column:ipv6_counts;comment:IPV6数量;"`                      //IPV6数量
 	PeersCounts       *int       `json:"peersCounts" form:"peersCounts" gorm:"column:peers_counts;comment:节点数量;"`                     //节点数量
@@ -29,6 +29,14 @@ type AsnInfo struct {
 	Ipv4CIDR          string     `json:"ipv4CIDR" form:"ipv4CIDR" gorm:"column:ipv4CIDR;comment:ipv4 CIDR数据;"`                        //IPV4 CIDR
 	Enable            *int       `json:"enable" form:"enable" gorm:"default:1;column:enable;comment:是否开启;" binding:"required"`        //是否开启
 	LastCIDRUpdate    *time.Time `json:"lastCIDRUpdate" form:"lastCIDRUpdate" gorm:"column:last_cidr_update;comment:CIDR最后更新时间;"`     //CIDR最后更新时间
+}
+
+// 条件查询结构体
+type AsnInfoParams struct {
+	global.GVA_MODEL
+	AsnName           string `json:"asnName" form:"asnName" gorm:"uniqueIndex;column:asn_name;comment:ASN名称;"`                  //ASN名称
+	FullName          string `json:"fullName" form:"fullName" gorm:"column:full_name;comment:ASN全名;"`                           //ASN全名
+	AllocationCountry string `json:"allocationCountry" form:"allocationCountry" gorm:"column:allocation_country;comment:分配国家;"` //分配国家
 }
 
 // TableName asnInfo表 AsnInfo自定义表名 asn_info

@@ -6,6 +6,7 @@ import (
 	cfscanReq "github.com/flipped-aurora/gin-vue-admin/server/model/cfscan/request"
 	"github.com/flipped-aurora/gin-vue-admin/server/model/common/response"
 	"github.com/flipped-aurora/gin-vue-admin/server/service"
+	"github.com/flipped-aurora/gin-vue-admin/server/utils"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
@@ -37,6 +38,10 @@ func (asnInfoApi *AsnInfoApi) CreateAsnInfo(c *gin.Context) {
 	} else {
 		response.OkWithMessage("创建成功", c)
 	}
+}
+
+func GetASNDetailByASN(asnName string) cfscan.AsnInfo {
+	return cfscan.AsnInfo{}
 }
 
 // DeleteAsnInfo 删除asnInfo表
@@ -132,6 +137,11 @@ func (asnInfoApi *AsnInfoApi) FindAsnInfo(c *gin.Context) {
 func (asnInfoApi *AsnInfoApi) GetAsnInfoList(c *gin.Context) {
 	var pageInfo cfscanReq.AsnInfoSearch
 	err := c.ShouldBindQuery(&pageInfo)
+	if err != nil {
+		response.FailWithMessage(err.Error(), c)
+		return
+	}
+	err = utils.Verify(pageInfo.PageInfo, utils.PageInfoVerify)
 	if err != nil {
 		response.FailWithMessage(err.Error(), c)
 		return

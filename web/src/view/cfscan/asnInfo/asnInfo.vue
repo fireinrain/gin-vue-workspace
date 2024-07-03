@@ -19,6 +19,24 @@
 
         <template v-if="showAllQuery">
           <!-- 将需要控制显示状态的查询条件添加到此范围内 -->
+          <el-form-item label="ASN名称">
+            <el-input
+                v-model="searchInfo.asnName"
+                placeholder="ASN名称"
+            />
+          </el-form-item>
+          <el-form-item label="ASN全名">
+            <el-input
+                v-model="searchInfo.fullName"
+                placeholder="ASN全名"
+            />
+          </el-form-item>
+          <el-form-item label="分配国家">
+            <el-input
+                v-model="searchInfo.allocationCountry"
+                placeholder="分配国家"
+            />
+          </el-form-item>
         </template>
 
         <el-form-item>
@@ -323,17 +341,6 @@ const formData = ref({
 // 验证规则
 const rule = reactive({
                asnName : [{
-                   required: true,
-                   message: '',
-                   trigger: ['input','blur'],
-               },
-               {
-                   whitespace: true,
-                   message: '不能只输入空格',
-                   trigger: ['input', 'blur'],
-              }
-              ],
-               fullName : [{
                    required: true,
                    message: '',
                    trigger: ['input','blur'],
