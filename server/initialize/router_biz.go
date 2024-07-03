@@ -14,6 +14,10 @@ func holder(routers ...*gin.RouterGroup) {
 func initBizRouter(routers ...*gin.RouterGroup) {
 	privateGroup := routers[0]
 	publicGroup := routers[1]
+	{
+		cfscanRouter := router.RouterGroupApp.Cfscan
+		cfscanRouter.InitAsnInfoRouter(privateGroup, publicGroup)
+	}
 
 	holder(publicGroup, privateGroup)
 }
