@@ -68,3 +68,19 @@ CREATE INDEX idx_asn_name ON asn_info(asn_name);
 --
 -- create index idx_asn_name
 --     on asn_info (asn_name);
+
+
+create table submit_scan(
+    scan_desc TEXT, --扫描描述
+    scan_type INTEGER, --1 表示扫描ASN 2表示扫描ASN列表 3表示单个IP 4表示多个ip
+    asn_number TEXT, --ASN编号
+    ipinfo_type INTEGER, --ip信息类型ip或是cidr 1是ip 2是cidr
+    ipinfo_list TEXT, --ip信息文本
+    enable_tls INTEGER, -- 0表示不开启 1表示开启
+    scan_ports TEXT, --扫描端口集合
+    scan_rate INTEGER, --扫描速率 默认10000
+    ipcheck_thread INTEGER, --ip检测线程数
+    enable_speedtest INTEGER, --是否开启测速 0表示关闭 1表示开启
+    scan_status INTEGER, --扫描状态
+    scan_result TEXT --扫描结果
+);
