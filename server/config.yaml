@@ -213,7 +213,7 @@ tencent-cos:
     path-prefix: github.com/flipped-aurora/gin-vue-admin/server
 zap:
     level: info
-    prefix: 'endless-cfcdn-admin/server]'
+    prefix: 'endless-cfcdn-admin/[server]'
     format: console
     director: log
     encode-level: LowercaseColorLevelEncoder
