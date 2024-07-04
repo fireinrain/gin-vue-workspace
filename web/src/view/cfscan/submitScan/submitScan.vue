@@ -122,7 +122,7 @@
               <div class="flex justify-between items-center">
                 <span class="text-lg">{{type==='create'?'添加':'修改'}}</span>
                 <div>
-                  <el-button type="primary" @click="enterDialog">确 定</el-button>
+                  <el-button type="primary" :disabled="formIsFormView" @click="enterDialog">确 定</el-button>
                   <el-button @click="closeDialog">取 消</el-button>
                 </div>
               </div>
@@ -482,6 +482,7 @@ const dialogFormVisible = ref(false)
 const openDialog = () => {
     type.value = 'create'
     dialogFormVisible.value = true
+    formIsFormView.value = false
 }
 
 // 关闭弹窗
