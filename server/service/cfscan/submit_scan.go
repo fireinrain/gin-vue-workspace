@@ -12,7 +12,30 @@ type SubmitScanService struct{}
 // Author [piexlmax](https://github.com/piexlmax)
 func (submitScanService *SubmitScanService) CreateSubmitScan(submitScan *cfscan.SubmitScan) (err error) {
 	err = global.GVA_DB.Create(submitScan).Error
-	return err
+	if err != nil {
+		return err
+	}
+	//scan ASN
+	if submitScan.ScanType == "1" {
+
+		return nil
+	}
+	//scan ASNS
+	if submitScan.ScanType == "2" {
+
+		return nil
+	}
+	//scan single ip
+	if submitScan.ScanType == "3" {
+		return nil
+	}
+	//scan ips
+	if submitScan.ScanType == "4" {
+
+		return nil
+	}
+
+	return nil
 }
 
 // DeleteSubmitScan 删除submitScan表记录

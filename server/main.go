@@ -35,5 +35,8 @@ func main() {
 		db, _ := global.GVA_DB.DB()
 		defer db.Close()
 	}
+
+	initialize.SelfAsynQTaskClientRun() //注册asynq本地server
+
 	core.RunWindowsServer()
 }
