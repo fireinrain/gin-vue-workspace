@@ -15,28 +15,29 @@
        —
       <el-date-picker v-model="searchInfo.endCreatedAt" type="datetime" placeholder="结束日期" :disabled-date="time=> searchInfo.startCreatedAt ? time.getTime() < searchInfo.startCreatedAt.getTime() : false"></el-date-picker>
       </el-form-item>
+        <el-form-item label="ASN名称">
+          <el-input
+              v-model="searchInfo.asnName"
+              placeholder="ASN名称"
+          />
+        </el-form-item>
+        <el-form-item label="ASN全名">
+          <el-input
+              v-model="searchInfo.fullName"
+              placeholder="ASN全名"
+          />
+        </el-form-item>
+        <el-form-item label="分配国家">
+          <el-input
+              v-model="searchInfo.allocationCountry"
+              placeholder="分配国家"
+          />
+        </el-form-item>
       
 
         <template v-if="showAllQuery">
           <!-- 将需要控制显示状态的查询条件添加到此范围内 -->
-          <el-form-item label="ASN名称">
-            <el-input
-                v-model="searchInfo.asnName"
-                placeholder="ASN名称"
-            />
-          </el-form-item>
-          <el-form-item label="ASN全名">
-            <el-input
-                v-model="searchInfo.fullName"
-                placeholder="ASN全名"
-            />
-          </el-form-item>
-          <el-form-item label="分配国家">
-            <el-input
-                v-model="searchInfo.allocationCountry"
-                placeholder="分配国家"
-            />
-          </el-form-item>
+
         </template>
 
         <el-form-item>
