@@ -100,7 +100,7 @@
         <!--<el-table-column align="left" label="扫描结果" prop="scanResult" width="120" />-->
         <el-table-column align="left" label="操作" fixed="right" min-width="240">
             <template #default="scope">
-            <el-button type="primary" link icon="edit" class="table-button" @click="updateSubmitScanFunc(scope.row)">变更</el-button>
+            <el-button type="primary" link icon="edit" class="table-button" @click="updateSubmitScanFunc(scope.row)">查看</el-button>
             <el-button type="primary" link icon="delete" @click="deleteRow(scope.row)">删除</el-button>
             </template>
         </el-table-column>
@@ -128,7 +128,7 @@
               </div>
             </template>
 
-          <el-form class="row-form" :model="formData" label-position="top" ref="elFormRef" :rules="rule" label-width="80px">
+          <el-form class="row-form" :model="formData" :disabled="formIsFormView" label-position="top" ref="elFormRef" :rules="rule" label-width="80px">
             <el-form-item label="扫描简介:"  prop="scanDesc" >
               <el-input v-model="formData.scanDesc" :clearable="true"  placeholder="请输入扫描简介" />
             </el-form-item>
@@ -222,7 +222,8 @@ const formData = ref({
         scanStatus: '',
         scanResult: '',
         })
-
+// 控制记录详情查看
+const formIsFormView = ref(false)
 
 
 // 验证规则
@@ -301,10 +302,10 @@ const isIpDisabled = ref(false)
 const handleScanTypeChange = (value) => {
   isIpDisabled.value = false
   isAsnDisabled.value = false
-  if(value == 1 || value == 2){
+  if(value === 1 || value === 2){
     isIpDisabled.value = true
   }
-  if(value == 3 || value == 4){
+  if(value === 3 || value === 4){
     isAsnDisabled.value = true
   }
 }
@@ -455,6 +456,7 @@ const updateSubmitScanFunc = async(row) => {
         formData.value = res.data
         dialogFormVisible.value = true
     }
+    formIsFormView.value = true
 }
 
 
