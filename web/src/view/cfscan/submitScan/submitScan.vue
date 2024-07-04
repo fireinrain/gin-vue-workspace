@@ -302,10 +302,10 @@ const isIpDisabled = ref(false)
 const handleScanTypeChange = (value) => {
   isIpDisabled.value = false
   isAsnDisabled.value = false
-  if(value === 1 || value === 2){
+  if(value === "1" || value === "2"){
     isIpDisabled.value = true
   }
-  if(value === 3 || value === 4){
+  if(value === "3" || value === "4"){
     isAsnDisabled.value = true
   }
 }
