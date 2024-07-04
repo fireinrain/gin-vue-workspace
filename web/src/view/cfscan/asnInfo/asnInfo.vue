@@ -267,10 +267,6 @@
           <el-form-item label="分配国家:" prop="allocationCountry">
             <el-input v-model="formData.allocationCountry" :clearable="true" placeholder="请输入分配国家" />
           </el-form-item>
-          <el-form-item label="IPV4 CIDR:" prop="ipv4CIDR">
-            <el-input v-model="formData.ipv4CIDR" :clearable="true" placeholder="请输入IPV4 CIDR" />
-          </el-form-item>
-
           <el-form-item label="CIDR最后更新时间:" prop="lastCIDRUpdate">
             <el-date-picker v-model="formData.lastCIDRUpdate" type="date" style="width: 100%" placeholder="选择日期" :clearable="true" />
           </el-form-item>
@@ -284,6 +280,9 @@
                   @change="()=>{switchEnable(scope.row)}"
               />
             </template>
+          </el-form-item>
+          <el-form-item label="IPV4 CIDR:" prop="ipv4CIDR">
+            <el-input :rows="5" type="textarea" v-model="formData.ipv4CIDR" :clearable="true" placeholder="请输入IPV4 CIDR" />
           </el-form-item>
         </el-form>
       </el-drawer>
