@@ -79,7 +79,9 @@
             </template>
         </el-table-column>
         <!--<el-table-column align="left" label="IP信息列表" prop="ipinfoList" width="120" />-->
-        <el-table-column align="left" label="开启TLS" prop="enableTls" width="120">
+          <el-table-column align="left" label="IP批量大小" prop="ipbatchSize" width="120"/>
+
+          <el-table-column align="left" label="开启TLS" prop="enableTls" width="120">
             <template #default="scope">
             {{ filterDict(scope.row.enableTls,TLSScanTypeOptions) }}
             </template>
@@ -148,6 +150,9 @@
             <el-form-item label="IP信息列表:"  prop="ipinfoList" >
               <el-input :row="4" type="textarea" :disabled="isIpDisabled" v-model="formData.ipinfoList" :clearable="true"  placeholder="请输入IP信息列表" />
             </el-form-item>
+            <el-form-item label="IP批量大小:" prop="ipbatchSize">
+              <el-input v-model="formData.ipbatchSize" :clearable="true" placeholder="请输入IP批量大小"/>
+            </el-form-item>
             <el-form-item label="开启TLS:"  prop="enableTls" >
               <el-select v-model="formData.enableTls" placeholder="请选择开启TLS" style="width:100%" :clearable="true" >
                 <el-option v-for="(item,key) in TLSScanTypeOptions" :key="key" :label="item.label" :value="item.value" />
@@ -214,6 +219,7 @@ const formData = ref({
         asnNumber: '',
         ipinfoType: '',
         ipinfoList: '',
+  ipbatchSize: 100000,
         enableTls: '1',
         scanPorts: '443',
         scanRate: 20000,
@@ -278,6 +284,12 @@ const rule = reactive({
                    trigger: ['input','blur'],
                },
               ],
+  ipbatchSize: [{
+    required: true,
+    message: '',
+    trigger: ['input', 'blur'],
+  },
+  ],
                ipcheckThread : [{
                    required: true,
                    message: '',
@@ -489,18 +501,19 @@ const openDialog = () => {
 const closeDialog = () => {
     dialogFormVisible.value = false
     formData.value = {
-        scanDesc: '',
-        scanType: '',
-        asnNumber: '',
-        ipinfoType: '',
-        ipinfoList: '',
-        enableTls: '',
-        scanPorts: '',
-        scanRate: undefined,
-        ipcheckThread: undefined,
-        enableSpeedtest: '',
-        scanStatus: '',
-        scanResult: '',
+      scanDesc: '',
+      scanType: '',
+      asnNumber: '',
+      ipinfoType: '',
+      ipinfoList: '',
+      ipbatchSize: 100000,
+      enableTls: '1',
+      scanPorts: '443',
+      scanRate: 20000,
+      ipcheckThread: 100,
+      enableSpeedtest: '1',
+      scanStatus: '',
+      scanResult: '',
         }
 }
 // 弹窗确定

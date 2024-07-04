@@ -13,6 +13,7 @@ type SubmitScan struct {
 	AsnNumber       string `json:"asnNumber" form:"asnNumber" gorm:"column:asn_number;comment:;"`                                                //asnNumber字段
 	IpinfoType      string `json:"ipinfoType" form:"ipinfoType" gorm:"column:ipinfo_type;comment:;"`                                             //ipinfoType字段
 	IpinfoList      string `json:"ipinfoList" form:"ipinfoList" gorm:"column:ipinfo_list;comment:;"`                                             //ipinfoList字段
+	IpbatchSize     *int   `json:"ipbatchSize" form:"ipbatchSize" gorm:"column:ipbatch_size;comment:;"`                                          //ipbatchSize字段
 	EnableTls       string `json:"enableTls" form:"enableTls" gorm:"default:1;column:enable_tls;comment:;" binding:"required"`                   //enableTls字段
 	ScanPorts       string `json:"scanPorts" form:"scanPorts" gorm:"default:443;column:scan_ports;comment:;" binding:"required"`                 //scanPorts字段
 	ScanRate        *int   `json:"scanRate" form:"scanRate" gorm:"default:10000;column:scan_rate;comment:;" binding:"required"`                  //scanRate字段

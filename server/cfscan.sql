@@ -76,6 +76,7 @@ create table submit_scan(
     asn_number TEXT, --ASN编号
     ipinfo_type INTEGER, --ip信息类型ip或是cidr 1是ip 2是cidr
     ipinfo_list TEXT, --ip信息文本
+    ip_batch_size INTEGER, --cidr ip 批量大小
     enable_tls INTEGER, -- 0表示不开启 1表示开启
     scan_ports TEXT, --扫描端口集合
     scan_rate INTEGER, --扫描速率 默认10000
