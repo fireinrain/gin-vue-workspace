@@ -74,6 +74,32 @@ func SplitCIDRs(cidrs []string, batchSize int) [][]string {
 		result = append(result, currentBatch)
 	}
 
+	// 如果拆分结果的批次数量超过25，忽略batchSize，按照总数不超过25的原则重新拆分
+	if len(result) > 25 {
+		result = SplitIntoMaxBatches(cidrs, 25)
+	}
+
+	return result
+}
+
+// splitIntoMaxBatches
+//
+//	@Description: 将CIDR列表尽可能拆分成总数不超过指定数量的批次
+//	@param cidrs
+//	@param maxBatches
+//	@return [][]string
+func SplitIntoMaxBatches(cidrs []string, maxBatches int) [][]string {
+	var result [][]string
+	batchSize := (len(cidrs) + maxBatches - 1) / maxBatches // 计算每个批次的最大CIDR数量
+
+	for i := 0; i < len(cidrs); i += batchSize {
+		end := i + batchSize
+		if end > len(cidrs) {
+			end = len(cidrs)
+		}
+		result = append(result, cidrs[i:end])
+	}
+
 	return result
 }
 
@@ -140,4 +166,37 @@ func GetCIDRByASN2File(asnName string, filePath string) {
 		}
 	}
 	fmt.Printf("Data written to %s\n", filePath)
+}
+
+// ExtractIPv4Addresses
+//
+//	@Description: 从字符串中抽取ip
+//	@param input
+//	@return []string
+func ExtractIPv4Addresses(input string) []string {
+	// IPv4 地址的正则表达式模式
+	// 这个模式匹配 0-255 范围内的数字，由点分隔，总共四组
+	pattern := `\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b`
+
+	// 编译正则表达式
+	re := regexp.MustCompile(pattern)
+
+	// 查找所有匹配项
+	matches := re.FindAllString(input, -1)
+
+	return matches
+}
+
+func ExtractIPv4CIDRAddresses(input string) []string {
+	// IPv4 CIDR 地址的正则表达式模式
+	// 这个模式匹配 IPv4 地址，后跟一个斜杠和 0-32 之间的数字
+	pattern := `\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\/(?:[0-9]|[12][0-9]|3[0-2])\b`
+
+	// 编译正则表达式
+	re := regexp.MustCompile(pattern)
+
+	// 查找所有匹配项
+	matches := re.FindAllString(input, -1)
+
+	return matches
 }

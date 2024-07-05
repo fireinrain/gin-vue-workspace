@@ -2,7 +2,6 @@ package cfscan
 
 import (
 	"context"
-	"fmt"
 	tasks "github.com/endless-cfcdn/shared-tasks"
 	"github.com/flipped-aurora/gin-vue-admin/server/global"
 	"github.com/flipped-aurora/gin-vue-admin/server/model/cfscan"
@@ -33,178 +32,502 @@ func (submitScanService *SubmitScanService) CreateSubmitScan(submitScan *cfscan.
 	if r.Error != nil {
 		return err
 	}
-	err = DoScanBackground(submitScan)
-	if err != nil {
-		return err
+	//scan single ASN
+	if submitScan.ScanType == "1" {
+		err = DoASNScanBackground(submitScan)
+		if err != nil {
+			return err
+		}
 	}
 	//scan ASNS
 	if submitScan.ScanType == "2" {
-
+		err := DoASNSScanBackground(submitScan)
+		if err != nil {
+			return err
+		}
 		return nil
 	}
-	//scan single ip
-	if submitScan.ScanType == "3" {
-		return nil
-	}
-	//scan ips
-	if submitScan.ScanType == "4" {
-
+	//scan single ip or ips
+	if submitScan.ScanType == "3" || submitScan.ScanType == "4" {
+		err := DoIPScanBackground(submitScan)
+		if err != nil {
+			return err
+		}
 		return nil
 	}
 
 	return nil
 }
 
-func DoScanBackground(submitScan *cfscan.SubmitScan) error {
+func DoIPScanBackground(submitScan *cfscan.SubmitScan) error {
+	ctx, cancel := context.WithTimeout(astkCtx, 12*time.Hour)
+	newRecordId := submitScan.ID
+
+	var batchedCIDRS [][]string
+	//scan IP
+	//IP类型 单ip类型
+	if submitScan.IpinfoType == "1" {
+		addresses := cfscan_utils.ExtractIPv4Addresses(submitScan.IpinfoList)
+		batchedCIDRS = [][]string{addresses}
+	}
+
+	//CIDR类型
+	if submitScan.IpinfoType == "2" {
+		addresses := cfscan_utils.ExtractIPv4CIDRAddresses(submitScan.IpinfoList)
+		//这里需要限制 最大批量数为25
+		batchedCIDRS = cfscan_utils.SplitCIDRs(addresses, *submitScan.IpbatchSize)
+	}
+
+	//update scan status--> 未运行到运行中
+	subscan := cfscan.SubmitScan{
+		ScanStatus: "1",
+	}
+	//update to db
+	err := global.GVA_DB.Model(&cfscan.SubmitScan{}).Where("id = ?", newRecordId).Updates(&subscan).Error
+	if err != nil {
+		log.Printf("Error on update submit scan for scan status: %s\n", err.Error())
+		return err
+	}
+	taskBatchSize := len(batchedCIDRS)
+	log.Printf("本次扫描任务将分成: %d 个小扫描任务\n", taskBatchSize)
+	var wg sync.WaitGroup
+	results := make(chan string, taskBatchSize)
+	for index, cidr := range batchedCIDRS {
+		wg.Add(1)
+		go func(index int, cidr []string) {
+			defer wg.Done()
+			select {
+			case <-ctx.Done():
+				// 超时或被取消
+				log.Printf("当前任务: %d 已超时,分发任务已取消运行...\n", index)
+				return
+			default:
+				var enableSpeedtest int = 1
+				if submitScan.EnableSpeedtest == "0" {
+					enableSpeedtest = 0
+				}
+				payload := tasks.IPScanCFPayload{
+					AsnNumber:       submitScan.AsnNumber,
+					EnableTls:       submitScan.EnableTls,
+					ScanPorts:       submitScan.ScanPorts,
+					ScanRate:        *submitScan.ScanRate,
+					IpcheckThread:   *submitScan.IpcheckThread,
+					EnableSpeedtest: enableSpeedtest,
+					CIDRList:        cidr,
+					IPBatchSize:     *submitScan.IpbatchSize,
+				}
+				runTask, _ := tasks.NewIPScanCFTask(payload)
+
+				info, err := global.AsynQClient.EnqueueContext(ctx, runTask)
+				if err != nil {
+					log.Printf("Enqueue error: %v", err)
+					return
+				}
+				log.Printf("enqueued task: id=%s queue=%s", info.ID, info.Queue)
+
+				// 等待任务完成
+				for {
+					select {
+					case <-ctx.Done():
+						// 超时或被取消
+						log.Printf("当前任务: %s已超时,任务等待结果已取消运行...\n", info.ID)
+						return
+					default:
+						taskInfo, err := global.AsynQInspector.GetTaskInfo("default", info.ID)
+						result := taskInfo.Result
+
+						if result == nil {
+							time.Sleep(5 * time.Second)
+							continue
+						}
+						if err != nil {
+							log.Printf("Error getting task info: %v", err)
+						}
+						log.Printf("Batch Task(%d/%d): %s,运行完成：\n", index, taskBatchSize, info.ID)
+						results <- string(result)
+						return
+					}
+				}
+			}
+		}(index, cidr)
+	}
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+	go func() {
+		defer cancel()
+		// 收集结果
+		var finalResult []string
+		for {
+			select {
+			case <-ctx.Done():
+				// 超时或被取消，更新扫描状态为超时
+				sub := cfscan.SubmitScan{
+					ScanStatus: "3", // 假设3表示超时状态
+					ScanResult: strings.Join(finalResult, ","),
+				}
+				err = global.GVA_DB.Model(&cfscan.SubmitScan{}).Where("id = ?", newRecordId).Updates(&sub).Error
+				if err != nil {
+					log.Printf("Error on update submit scan for timeout: %s\n", err.Error())
+				}
+				log.Printf("Batch Task cancled due to the timeout on waiting result: RecordID: %s", newRecordId)
+				return
+			case result, ok := <-results:
+				if !ok {
+					// 通道已关闭，所有结果已收集完毕
+					// ... (保持原有的结果处理逻辑不变)
+					//convert sub json list to big json
+					// 创建一个切片来存储去掉方括号的 JSON 对象
+					var jsonObjects []string
+
+					// 遍历每个 JSON 列表并去掉方括号
+					for _, jsonList := range finalResult {
+						jsonObjects = append(jsonObjects, strings.TrimSuffix(strings.TrimPrefix(jsonList, "["), "]"))
+					}
+
+					// 将所有 JSON 对象用逗号连接起来，并包裹在方括号中
+					mergedJSON := "[" + strings.Join(jsonObjects, ",") + "]"
+					sub := cfscan.SubmitScan{
+						ScanResult: mergedJSON,
+						ScanStatus: "2",
+					}
+					//save to db
+					err = global.GVA_DB.Model(&cfscan.SubmitScan{}).Where("id = ?", newRecordId).Updates(&sub).Error
+					if err != nil {
+						log.Printf("Error on update submit scan for result data: %s\n", err.Error())
+					}
+					log.Println("Submit Task finished: Submit RecordID", newRecordId)
+					return
+				}
+				if result != "EmptyResult" {
+					finalResult = append(finalResult, result)
+				}
+			}
+		}
+
+	}()
+
+	return nil
+}
+
+func DoASNScanBackground(submitScan *cfscan.SubmitScan) error {
 	ctx, cancel := context.WithTimeout(astkCtx, 12*time.Hour)
 	newRecordId := submitScan.ID
 
 	//scan ASN
-	if submitScan.ScanType == "1" {
 
-		var asnInfo cfscan.AsnInfo
-		tx := global.GVA_DB.Where("asn_name = ?", submitScan.AsnNumber).Find(&asnInfo)
-		if tx.RowsAffected == 0 {
-			//创建一个
-			var enable = 1
-			info := cfscan.AsnInfo{AsnName: submitScan.AsnNumber, Enable: &enable}
-			asnInfoService.CreateAsnInfo(&info)
-			_ = global.GVA_DB.Where("asn_name = ?", submitScan.AsnNumber).Find(&asnInfo)
-		}
-		waitForProcess := strings.Split(asnInfo.Ipv4CIDR, "\n")
-		batchedCIDRS := cfscan_utils.SplitCIDRs(waitForProcess, *submitScan.IpbatchSize)
+	var asnInfo cfscan.AsnInfo
+	tx := global.GVA_DB.Where("asn_name = ?", submitScan.AsnNumber).Find(&asnInfo)
+	if tx.RowsAffected == 0 {
+		//创建一个
+		var enable = 1
+		info := cfscan.AsnInfo{AsnName: submitScan.AsnNumber, Enable: &enable}
+		asnInfoService.CreateAsnInfo(&info)
+		_ = global.GVA_DB.Where("asn_name = ?", submitScan.AsnNumber).Find(&asnInfo)
+	}
+	waitForProcess := strings.Split(asnInfo.Ipv4CIDR, "\n")
+	//这里需要限制 最大批量数为25
+	batchedCIDRS := cfscan_utils.SplitCIDRs(waitForProcess, *submitScan.IpbatchSize)
 
-		//update scan status--> 未运行到运行中
-		subscan := cfscan.SubmitScan{
-			ScanStatus: "1",
-		}
-		//update to db
-		err := global.GVA_DB.Model(&cfscan.SubmitScan{}).Where("id = ?", newRecordId).Updates(&subscan).Error
-		if err != nil {
-			log.Printf("Error on update submit scan for scan status: %s\n", err.Error())
-			return err
-		}
+	//update scan status--> 未运行到运行中
+	subscan := cfscan.SubmitScan{
+		ScanStatus: "1",
+	}
+	//update to db
+	err := global.GVA_DB.Model(&cfscan.SubmitScan{}).Where("id = ?", newRecordId).Updates(&subscan).Error
+	if err != nil {
+		log.Printf("Error on update submit scan for scan status: %s\n", err.Error())
+		return err
+	}
+	taskBatchSize := len(batchedCIDRS)
+	log.Printf("本次扫描任务将分成: %d 个小扫描任务\n", taskBatchSize)
 
-		var wg sync.WaitGroup
-		results := make(chan string, len(batchedCIDRS))
-		for index, cidr := range batchedCIDRS {
-			wg.Add(1)
-			go func(index int, cidr []string) {
-				defer wg.Done()
-				select {
-				case <-ctx.Done():
-					// 超时或被取消
-					log.Printf("当前任务: %d 已超时,分发任务已取消运行...\n", index)
-					return
-				default:
-					var enableSpeedtest int = 1
-					if submitScan.EnableSpeedtest == "0" {
-						enableSpeedtest = 0
-					}
-					payload := tasks.ASNScanCFPayload{
-						AsnNumber:       submitScan.AsnNumber,
-						EnableTls:       submitScan.EnableTls,
-						ScanPorts:       submitScan.ScanPorts,
-						ScanRate:        *submitScan.ScanRate,
-						IpcheckThread:   *submitScan.IpcheckThread,
-						EnableSpeedtest: enableSpeedtest,
-						CIDRList:        cidr,
-						IPBatchSize:     *submitScan.IpbatchSize,
-					}
-					runTask, _ := tasks.NewASNScanCFTask(payload)
-
-					info, err := global.AsynQClient.EnqueueContext(ctx, runTask)
-					if err != nil {
-						log.Printf("Enqueue error: %v", err)
-						return
-					}
-					log.Printf("enqueued task: id=%s queue=%s", info.ID, info.Queue)
-
-					// 等待任务完成
-					for {
-						select {
-						case <-ctx.Done():
-							// 超时或被取消
-							log.Printf("当前任务: %s已超时,任务等待结果已取消运行...\n", info.ID)
-							return
-						default:
-							taskInfo, err := global.AsynQInspector.GetTaskInfo("default", info.ID)
-							if err != nil {
-								log.Printf("Error getting task info: %v", err)
-								time.Sleep(3 * time.Second)
-								continue
-							}
-
-							result := taskInfo.Result
-							if result == nil {
-								time.Sleep(3 * time.Second)
-								continue
-							}
-							fmt.Printf("Task: %s,运行完成：\n", info.ID)
-							results <- string(result)
-							return
-						}
-					}
+	var wg sync.WaitGroup
+	results := make(chan string, taskBatchSize)
+	for index, cidr := range batchedCIDRS {
+		wg.Add(1)
+		go func(index int, cidr []string) {
+			defer wg.Done()
+			select {
+			case <-ctx.Done():
+				// 超时或被取消
+				log.Printf("当前任务: %d 已超时,分发任务已取消运行...\n", index)
+				return
+			default:
+				var enableSpeedtest int = 1
+				if submitScan.EnableSpeedtest == "0" {
+					enableSpeedtest = 0
 				}
-			}(index, cidr)
-		}
+				payload := tasks.ASNScanCFPayload{
+					AsnNumber:       submitScan.AsnNumber,
+					EnableTls:       submitScan.EnableTls,
+					ScanPorts:       submitScan.ScanPorts,
+					ScanRate:        *submitScan.ScanRate,
+					IpcheckThread:   *submitScan.IpcheckThread,
+					EnableSpeedtest: enableSpeedtest,
+					CIDRList:        cidr,
+					IPBatchSize:     *submitScan.IpbatchSize,
+				}
+				runTask, _ := tasks.NewASNScanCFTask(payload)
 
-		go func() {
-			wg.Wait()
-			close(results)
-		}()
-		go func() {
-			defer cancel()
-			// 收集结果
-			var finalResult []string
-			for {
-				select {
-				case <-ctx.Done():
-					// 超时或被取消，更新扫描状态为超时
-					sub := cfscan.SubmitScan{
-						ScanStatus: "3", // 假设3表示超时状态
-						ScanResult: strings.Join(finalResult, ","),
-					}
-					err = global.GVA_DB.Model(&cfscan.SubmitScan{}).Where("id = ?", newRecordId).Updates(&sub).Error
-					if err != nil {
-						log.Printf("Error on update submit scan for timeout: %s\n", err.Error())
-					}
+				info, err := global.AsynQClient.EnqueueContext(ctx, runTask)
+				if err != nil {
+					log.Printf("Enqueue error: %v", err)
 					return
-				case result, ok := <-results:
-					if !ok {
-						// 通道已关闭，所有结果已收集完毕
-						// ... (保持原有的结果处理逻辑不变)
-						//convert sub json list to big json
-						// 创建一个切片来存储去掉方括号的 JSON 对象
-						var jsonObjects []string
+				}
+				log.Printf("enqueued task: id=%s queue=%s", info.ID, info.Queue)
 
-						// 遍历每个 JSON 列表并去掉方括号
-						for _, jsonList := range finalResult {
-							jsonObjects = append(jsonObjects, strings.TrimSuffix(strings.TrimPrefix(jsonList, "["), "]"))
-						}
-
-						// 将所有 JSON 对象用逗号连接起来，并包裹在方括号中
-						mergedJSON := "[" + strings.Join(jsonObjects, ",") + "]"
-						sub := cfscan.SubmitScan{
-							ScanResult: mergedJSON,
-							ScanStatus: "2",
-						}
-						//save to db
-						err = global.GVA_DB.Model(&cfscan.SubmitScan{}).Where("id = ?", newRecordId).Updates(&sub).Error
-						if err != nil {
-							log.Printf("Error on update submit scan for result data: %s\n", err.Error())
-						}
-
+				// 等待任务完成
+				for {
+					select {
+					case <-ctx.Done():
+						// 超时或被取消
+						log.Printf("当前任务: %s已超时,任务等待结果已取消运行...\n", info.ID)
 						return
-					}
-					if result != "" {
-						finalResult = append(finalResult, result)
+					default:
+						taskInfo, err := global.AsynQInspector.GetTaskInfo("default", info.ID)
+						result := taskInfo.Result
+
+						if result == nil {
+							time.Sleep(5 * time.Second)
+							continue
+						}
+						if err != nil {
+							log.Printf("Error getting task info: %v", err)
+						}
+						log.Printf("Batch Task(%d/%d): %s,运行完成：\n", index, taskBatchSize, info.ID)
+						results <- string(result)
+						return
 					}
 				}
 			}
-
-		}()
+		}(index, cidr)
 	}
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+	go func() {
+		defer cancel()
+		// 收集结果
+		var finalResult []string
+		for {
+			select {
+			case <-ctx.Done():
+				// 超时或被取消，更新扫描状态为超时
+				sub := cfscan.SubmitScan{
+					ScanStatus: "3", // 假设3表示超时状态
+					ScanResult: strings.Join(finalResult, ","),
+				}
+				err = global.GVA_DB.Model(&cfscan.SubmitScan{}).Where("id = ?", newRecordId).Updates(&sub).Error
+				if err != nil {
+					log.Printf("Error on update submit scan for timeout: %s\n", err.Error())
+				}
+				log.Printf("Batch Task cancled due to the timeout on waiting result: SubmitRecordID: %s", newRecordId)
+				return
+			case result, ok := <-results:
+				if !ok {
+					// 通道已关闭，所有结果已收集完毕
+					// ... (保持原有的结果处理逻辑不变)
+					//convert sub json list to big json
+					// 创建一个切片来存储去掉方括号的 JSON 对象
+					var jsonObjects []string
+
+					// 遍历每个 JSON 列表并去掉方括号
+					for _, jsonList := range finalResult {
+						jsonObjects = append(jsonObjects, strings.TrimSuffix(strings.TrimPrefix(jsonList, "["), "]"))
+					}
+
+					// 将所有 JSON 对象用逗号连接起来，并包裹在方括号中
+					mergedJSON := "[" + strings.Join(jsonObjects, ",") + "]"
+					sub := cfscan.SubmitScan{
+						ScanResult: mergedJSON,
+						ScanStatus: "2",
+					}
+					//save to db
+					err = global.GVA_DB.Model(&cfscan.SubmitScan{}).Where("id = ?", newRecordId).Updates(&sub).Error
+					if err != nil {
+						log.Printf("Error on update submit scan for result data: %s\n", err.Error())
+					}
+
+					log.Println("Submit Task finished: Submit RecordID", newRecordId)
+
+					return
+				}
+				if result != "EmptyResult" {
+					finalResult = append(finalResult, result)
+				}
+			}
+		}
+
+	}()
+
+	return nil
+}
+
+func DoASNSScanBackground(submitScan *cfscan.SubmitScan) error {
+	ctx, cancel := context.WithTimeout(astkCtx, 12*3*time.Hour)
+	newRecordId := submitScan.ID
+
+	//scan ASN
+	asnNumbers := submitScan.AsnNumber
+	asnList := strings.Split(asnNumbers, ",")
+	var allAsnCIDRList []string
+	for _, asn := range asnList {
+		log.Println("Process ASN: ", asn)
+		var asnInfo cfscan.AsnInfo
+		tx := global.GVA_DB.Where("asn_name = ?", asn).Find(&asnInfo)
+		if tx.RowsAffected == 0 {
+			//创建一个
+			var enable = 1
+			info := cfscan.AsnInfo{AsnName: asn, Enable: &enable}
+			asnInfoService.CreateAsnInfo(&info)
+			_ = global.GVA_DB.Where("asn_name = ?", asn).Find(&asnInfo)
+		}
+		waitForProcess := strings.Split(asnInfo.Ipv4CIDR, "\n")
+		allAsnCIDRList = append(allAsnCIDRList, waitForProcess...)
+	}
+
+	//这里需要限制 最大批量数为25
+	batchedCIDRS := cfscan_utils.SplitCIDRs(allAsnCIDRList, *submitScan.IpbatchSize)
+
+	//update scan status--> 未运行到运行中
+	subscan := cfscan.SubmitScan{
+		ScanStatus: "1",
+	}
+	//update to db
+	err := global.GVA_DB.Model(&cfscan.SubmitScan{}).Where("id = ?", newRecordId).Updates(&subscan).Error
+	if err != nil {
+		log.Printf("Error on update submit scan for scan status: %s\n", err.Error())
+		return err
+	}
+	taskBatchSize := len(batchedCIDRS)
+	log.Printf("本次扫描任务将分成: %d 个小扫描任务\n", taskBatchSize)
+
+	var wg sync.WaitGroup
+	results := make(chan string, len(batchedCIDRS))
+	for index, cidr := range batchedCIDRS {
+		wg.Add(1)
+		go func(index int, cidr []string) {
+			defer wg.Done()
+			select {
+			case <-ctx.Done():
+				// 超时或被取消
+				log.Printf("当前任务: %d 已超时,分发任务已取消运行...\n", index)
+				return
+			default:
+				var enableSpeedtest int = 1
+				if submitScan.EnableSpeedtest == "0" {
+					enableSpeedtest = 0
+				}
+				payload := tasks.ASNScanCFPayload{
+					AsnNumber:       submitScan.AsnNumber,
+					EnableTls:       submitScan.EnableTls,
+					ScanPorts:       submitScan.ScanPorts,
+					ScanRate:        *submitScan.ScanRate,
+					IpcheckThread:   *submitScan.IpcheckThread,
+					EnableSpeedtest: enableSpeedtest,
+					CIDRList:        cidr,
+					IPBatchSize:     *submitScan.IpbatchSize,
+				}
+				runTask, _ := tasks.NewASNScanCFTask(payload)
+
+				info, err := global.AsynQClient.EnqueueContext(ctx, runTask)
+				if err != nil {
+					log.Printf("Enqueue error: %v", err)
+					return
+				}
+				log.Printf("enqueued task: id=%s queue=%s", info.ID, info.Queue)
+
+				// 等待任务完成
+				for {
+					select {
+					case <-ctx.Done():
+						// 超时或被取消
+						log.Printf("当前任务: %s已超时,任务等待结果已取消运行...\n", info.ID)
+						return
+					default:
+						taskInfo, err := global.AsynQInspector.GetTaskInfo("default", info.ID)
+						result := taskInfo.Result
+
+						if result == nil {
+							time.Sleep(5 * time.Second)
+							continue
+						}
+						if err != nil {
+							log.Printf("Error getting task info: %v", err)
+						}
+						log.Printf("Batch Task(%d/%d): %s,运行完成：\n", index, taskBatchSize, info.ID)
+						results <- string(result)
+						return
+					}
+				}
+			}
+		}(index, cidr)
+	}
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+	go func() {
+		defer cancel()
+		// 收集结果
+		var finalResult []string
+		for {
+			select {
+			case <-ctx.Done():
+				// 超时或被取消，更新扫描状态为超时
+				sub := cfscan.SubmitScan{
+					ScanStatus: "3", // 假设3表示超时状态
+					ScanResult: strings.Join(finalResult, ","),
+				}
+				err = global.GVA_DB.Model(&cfscan.SubmitScan{}).Where("id = ?", newRecordId).Updates(&sub).Error
+				if err != nil {
+					log.Printf("Error on update submit scan for timeout: %s\n", err.Error())
+				}
+				log.Printf("Batch Task cancled due to the timeout on waiting result: SubmitRecordID: %s", newRecordId)
+				return
+			case result, ok := <-results:
+				if !ok {
+					// 通道已关闭，所有结果已收集完毕
+					// ... (保持原有的结果处理逻辑不变)
+					//convert sub json list to big json
+					// 创建一个切片来存储去掉方括号的 JSON 对象
+					var jsonObjects []string
+
+					// 遍历每个 JSON 列表并去掉方括号
+					for _, jsonList := range finalResult {
+						jsonObjects = append(jsonObjects, strings.TrimSuffix(strings.TrimPrefix(jsonList, "["), "]"))
+					}
+
+					// 将所有 JSON 对象用逗号连接起来，并包裹在方括号中
+					mergedJSON := "[" + strings.Join(jsonObjects, ",") + "]"
+					sub := cfscan.SubmitScan{
+						ScanResult: mergedJSON,
+						ScanStatus: "2",
+					}
+					//save to db
+					err = global.GVA_DB.Model(&cfscan.SubmitScan{}).Where("id = ?", newRecordId).Updates(&sub).Error
+					if err != nil {
+						log.Printf("Error on update submit scan for result data: %s\n", err.Error())
+					}
+
+					log.Println("Submit Task finished: Submit RecordID", newRecordId)
+
+					return
+				}
+				if result != "EmptyResult" {
+					finalResult = append(finalResult, result)
+				}
+			}
+		}
+
+	}()
+
 	return nil
 
 }
