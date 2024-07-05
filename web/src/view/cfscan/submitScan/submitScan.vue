@@ -15,7 +15,7 @@
        —
       <el-date-picker v-model="searchInfo.endCreatedAt" type="datetime" placeholder="结束日期" :disabled-date="time=> searchInfo.startCreatedAt ? time.getTime() < searchInfo.startCreatedAt.getTime() : false"></el-date-picker>
       </el-form-item>
-      
+
         <el-form-item label="扫描简介" prop="scanDesc">
          <el-input v-model="searchInfo.scanDesc" placeholder="搜索条件" />
 
@@ -61,11 +61,11 @@
         @selection-change="handleSelectionChange"
         >
         <el-table-column type="selection" width="55" />
-        
+
         <el-table-column align="left" label="日期" prop="createdAt" width="180">
             <template #default="scope">{{ formatDate(scope.row.CreatedAt) }}</template>
         </el-table-column>
-        
+
         <el-table-column align="left" label="扫描简介" prop="scanDesc" width="120" />
         <el-table-column align="left" label="扫描类型" prop="scanType" width="120">
             <template #default="scope">
@@ -284,12 +284,19 @@ const rule = reactive({
                    trigger: ['input','blur'],
                },
               ],
-  ipbatchSize: [{
-    required: true,
-    message: '',
-    trigger: ['input', 'blur'],
-  },
-  ],
+              asnNumber : [{
+                required: true,
+                message: '',
+                trigger: ['input','blur'],
+              },
+              ]
+              ,
+              ipbatchSize: [{
+                required: true,
+                message: '',
+                trigger: ['input', 'blur'],
+              },
+              ],
                ipcheckThread : [{
                    required: true,
                    message: '',
@@ -316,9 +323,11 @@ const handleScanTypeChange = (value) => {
   isAsnDisabled.value = false
   if(value === "1" || value === "2"){
     isIpDisabled.value = true
+    rule.asnNumber[0]["required"]=true
   }
   if(value === "3" || value === "4"){
     isAsnDisabled.value = true
+    rule.asnNumber[0]["required"]=false
   }
 }
 
