@@ -2,6 +2,7 @@ package global
 
 import (
 	"github.com/hibiken/asynq"
+	"github.com/gin-gonic/gin"
 	"github.com/qiniu/qmgo"
 	"sync"
 
@@ -30,7 +31,7 @@ var (
 	GVA_LOG                 *zap.Logger
 	GVA_Timer               timer.Timer = timer.NewTimerTask()
 	GVA_Concurrency_Control             = &singleflight.Group{}
-
+	GVA_ROUTERS             gin.RoutesInfo
 	BlackCache     local_cache.Cache
 	lock           sync.RWMutex
 	AsynQClient    *asynq.Client
