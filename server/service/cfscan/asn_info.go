@@ -80,7 +80,7 @@ func (asnInfoService *AsnInfoService) GetAsnInfoInfoList(info cfscanReq.AsnInfoS
 	if limit != 0 {
 		db = db.Limit(limit).Offset(offset)
 	}
-
-	err = db.Find(&asnInfos).Error
+	OrderStr := "id desc"
+	err = db.Order(OrderStr).Find(&asnInfos).Error
 	return asnInfos, total, err
 }

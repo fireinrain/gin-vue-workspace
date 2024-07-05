@@ -592,7 +592,8 @@ func (submitScanService *SubmitScanService) GetSubmitScanInfoList(info cfscanReq
 	if limit != 0 {
 		db = db.Limit(limit).Offset(offset)
 	}
+	OrderStr := "id desc"
 
-	err = db.Find(&submitScans).Error
+	err = db.Order(OrderStr).Find(&submitScans).Error
 	return submitScans, total, err
 }
