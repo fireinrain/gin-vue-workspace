@@ -204,6 +204,8 @@ system:
     use-multipoint: false
     use-redis: false
     use-mongo: false
+    # AI服务路径
+    ai-path: ""
 tencent-cos:
     bucket: xxxxx-10005608
     region: ap-shanghai
