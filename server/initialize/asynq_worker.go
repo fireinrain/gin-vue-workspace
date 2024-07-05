@@ -15,8 +15,22 @@ import (
 	"time"
 )
 
+const redisAddr = "cloud2.131433.xyz:5379"
+
+func AsynQClient() *asynq.Client {
+	redisClientOpt := asynq.RedisClientOpt{Addr: redisAddr, Password: "fireinrain@redis", DB: 0}
+	client := asynq.NewClient(redisClientOpt)
+	return client
+	//defer client.Close()
+}
+
+func AsynQInspector() *asynq.Inspector {
+	redisClientOpt := asynq.RedisClientOpt{Addr: redisAddr, Password: "fireinrain@redis", DB: 0}
+	inspector := asynq.NewInspector(redisClientOpt)
+	return inspector
+}
+
 func SelfAsynQTaskClientRun() {
-	const redisAddr = "cloud2.131433.xyz:5379"
 
 	go func() {
 		//scheduler

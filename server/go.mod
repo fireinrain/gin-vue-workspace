@@ -1,6 +1,8 @@
 module github.com/flipped-aurora/gin-vue-admin/server
 
-go 1.22
+go 1.22.0
+
+toolchain go1.22.4
 
 require (
 	github.com/PuerkitoBio/goquery v1.9.2
@@ -8,6 +10,7 @@ require (
 	github.com/aws/aws-sdk-go v1.44.307
 	github.com/casbin/casbin/v2 v2.87.1
 	github.com/casbin/gorm-adapter/v3 v3.18.0
+	github.com/endless-cfcdn/shared-tasks v0.0.0-00010101000000-000000000000
 	github.com/flipped-aurora/ws v1.0.2
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/fvbock/endless v0.0.0-20170109170031-447134032cb6
@@ -16,6 +19,7 @@ require (
 	github.com/go-sql-driver/mysql v1.7.1
 	github.com/gofrs/uuid/v5 v5.0.0
 	github.com/golang-jwt/jwt/v4 v4.5.0
+	github.com/google/uuid v1.3.0
 	github.com/gookit/color v1.5.4
 	github.com/hibiken/asynq v0.24.1
 	github.com/huaweicloud/huaweicloud-sdk-go-obs v3.21.8+incompatible
@@ -40,7 +44,7 @@ require (
 	github.com/xuri/excelize/v2 v2.8.0
 	go.mongodb.org/mongo-driver v1.12.1
 	go.uber.org/automaxprocs v1.5.3
-	go.uber.org/zap v1.24.0
+	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.22.0
 	golang.org/x/sync v0.5.0
 	golang.org/x/text v0.14.0
@@ -86,7 +90,6 @@ require (
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/go-querystring v1.0.0 // indirect
-	github.com/google/uuid v1.3.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
@@ -142,8 +145,7 @@ require (
 	github.com/xuri/nfp v0.0.0-20230819163627-dc951e3ffe1a // indirect
 	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
 	github.com/yusufpapurcu/wmi v1.2.3 // indirect
-	go.uber.org/atomic v1.9.0 // indirect
-	go.uber.org/multierr v1.8.0 // indirect
+	go.uber.org/multierr v1.10.0 // indirect
 	go4.org v0.0.0-20200411211856-f5505b9728dd // indirect
 	golang.org/x/arch v0.3.0 // indirect
 	golang.org/x/image v0.15.0 // indirect
@@ -160,3 +162,5 @@ require (
 	modernc.org/memory v1.6.0 // indirect
 	modernc.org/sqlite v1.23.0 // indirect
 )
+
+replace github.com/endless-cfcdn/shared-tasks => ../../shared-tasks

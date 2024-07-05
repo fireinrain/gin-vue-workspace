@@ -1,6 +1,7 @@
 package cfscan
 
 import (
+	"errors"
 	"github.com/flipped-aurora/gin-vue-admin/server/global"
 	"github.com/flipped-aurora/gin-vue-admin/server/model/cfscan"
 	cfscanReq "github.com/flipped-aurora/gin-vue-admin/server/model/cfscan/request"
@@ -11,6 +12,10 @@ type AsnInfoService struct{}
 // CreateAsnInfo 创建asnInfo表记录
 // Author [piexlmax](https://github.com/piexlmax)
 func (asnInfoService *AsnInfoService) CreateAsnInfo(asnInfo *cfscan.AsnInfo) (err error) {
+	enable := asnInfo.Enable
+	if asnInfo.AsnName == "" || *enable == 0 {
+		return errors.New("ASN name cant be empty or enable cant be 0")
+	}
 	err = global.GVA_DB.Create(asnInfo).Error
 	return err
 }
