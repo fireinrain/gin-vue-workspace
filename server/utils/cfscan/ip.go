@@ -37,7 +37,7 @@ func CountIPs(cidr string) int {
 //	@return [][]string
 //
 // 分割CIDR列表
-func splitCIDRs(cidrs []string, batchSize int) [][]string {
+func SplitCIDRs(cidrs []string, batchSize int) [][]string {
 	type cidrWithCount struct {
 		cidr  string
 		count int
