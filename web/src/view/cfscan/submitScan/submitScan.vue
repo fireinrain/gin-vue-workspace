@@ -219,7 +219,7 @@ const formData = ref({
         asnNumber: '',
         ipinfoType: '',
         ipinfoList: '',
-  ipbatchSize: 100000,
+        ipbatchSize: 100000,
         enableTls: '1',
         scanPorts: '443',
         scanRate: 20000,
@@ -567,7 +567,7 @@ const enterDialog = async () => {
 
 </script>
 
-<style>
+<style scoped>
 .row-form {
   display: flex;
   flex-wrap: wrap;
