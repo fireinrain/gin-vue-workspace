@@ -1,32 +1,33 @@
-CREATE TABLE asn_info (
-                          id INTEGER PRIMARY KEY,                  -- id编号 主键
-                          asn_name TEXT NOT NULL,                  -- ASN名称（不能为空）
-                          full_name TEXT NOT NULL,                 -- ASN全名（不能为空）
-                          ipv4_counts INTEGER,                     -- ipv4数量
-                          ipv6_counts INTEGER,                     -- ipv6数量
-                          peers_counts INTEGER,                    -- 节点数量
-                          ipv4_peers INTEGER,                      -- ipv4节点数量
-                          ipv6_peers INTEGER,                      -- ipv6节点数量
-                          prefixes_counts INTEGER,                 -- 前缀数量
-                          ipv4_prefixies INTEGER,                  -- ipv4前缀数量
-                          ipv6_prefixies INTEGER,                  -- ipv6前缀数量
-                          regional_registry TEXT,                  -- 地区登记
-                          traffic_bandwidth TEXT,                  -- 流量估算
-                          allocation_status TEXT,                  -- 分配状态 未分配 已分配
-                          traffic_ratio TEXT,                      -- 流量比率
-                          allocation_date TEXT,                    -- 分配日期
-                          website TEXT,                            -- 网站地址
-                          allocation_country TEXT,                 -- 分配国家
-                          ipv4CIDR TEXT,                           --ipv4CIDR 数据
-                          last_cidr_update DATETIME,               --cidr最新更新日期
-                          created_at DATETIME,  -- 创建日期（默认为创建时的时间戳）
-                          updated_at DATETIME,  -- 更新日期（默认为当前时间戳）
-                          deleted_at DATETIME,                     -- 删除日期
-                          enable INTEGER DEFAULT 1                 -- 是否开启（默认为1）
+CREATE TABLE asn_info
+(
+    id                 INTEGER PRIMARY KEY, -- id编号 主键
+    asn_name           TEXT NOT NULL,       -- ASN名称（不能为空）
+    full_name          TEXT NOT NULL,       -- ASN全名（不能为空）
+    ipv4_counts        INTEGER,             -- ipv4数量
+    ipv6_counts        INTEGER,             -- ipv6数量
+    peers_counts       INTEGER,             -- 节点数量
+    ipv4_peers         INTEGER,             -- ipv4节点数量
+    ipv6_peers         INTEGER,             -- ipv6节点数量
+    prefixes_counts    INTEGER,             -- 前缀数量
+    ipv4_prefixies     INTEGER,             -- ipv4前缀数量
+    ipv6_prefixies     INTEGER,             -- ipv6前缀数量
+    regional_registry  TEXT,                -- 地区登记
+    traffic_bandwidth  TEXT,                -- 流量估算
+    allocation_status  TEXT,                -- 分配状态 未分配 已分配
+    traffic_ratio      TEXT,                -- 流量比率
+    allocation_date    TEXT,                -- 分配日期
+    website            TEXT,                -- 网站地址
+    allocation_country TEXT,                -- 分配国家
+    ipv4CIDR           TEXT,                --ipv4CIDR 数据
+    last_cidr_update   DATETIME,            --cidr最新更新日期
+    created_at         DATETIME,            -- 创建日期（默认为创建时的时间戳）
+    updated_at         DATETIME,            -- 更新日期（默认为当前时间戳）
+    deleted_at         DATETIME,            -- 删除日期
+    enable             INTEGER DEFAULT 1    -- 是否开启（默认为1）
 );
 
 -- 为 asn_name 创建索引
-CREATE INDEX idx_asn_name ON asn_info(asn_name);
+CREATE INDEX idx_asn_name ON asn_info (asn_name);
 
 -- 创建触发器以自动更新 updated_at 字段
 -- CREATE TRIGGER update_asn_info_timestamp
@@ -70,18 +71,42 @@ CREATE INDEX idx_asn_name ON asn_info(asn_name);
 --     on asn_info (asn_name);
 
 
-create table submit_scan(
-    scan_desc TEXT, --扫描描述
-    scan_type INTEGER, --1 表示扫描ASN 2表示扫描ASN列表 3表示单个IP 4表示多个ip
-    asn_number TEXT, --ASN编号
-    ipinfo_type INTEGER, --ip信息类型ip或是cidr 1是ip 2是cidr
-    ipinfo_list TEXT, --ip信息文本
-    ip_batch_size INTEGER, --cidr ip 批量大小
-    enable_tls INTEGER, -- 0表示不开启 1表示开启
-    scan_ports TEXT, --扫描端口集合
-    scan_rate INTEGER, --扫描速率 默认10000
-    ipcheck_thread INTEGER, --ip检测线程数
+create table submit_scan
+(
+    scan_desc        TEXT,    --扫描描述
+    scan_type        INTEGER, --1 表示扫描ASN 2表示扫描ASN列表 3表示单个IP 4表示多个ip
+    asn_number       TEXT,    --ASN编号
+    ipinfo_type      INTEGER, --ip信息类型ip或是cidr 1是ip 2是cidr
+    ipinfo_list      TEXT,    --ip信息文本
+    ip_batch_size    INTEGER, --cidr ip 批量大小
+    enable_tls       INTEGER, -- 0表示不开启 1表示开启
+    scan_ports       TEXT,    --扫描端口集合
+    scan_rate        INTEGER, --扫描速率 默认10000
+    ipcheck_thread   INTEGER, --ip检测线程数
     enable_speedtest INTEGER, --是否开启测速 0表示关闭 1表示开启
-    scan_status INTEGER, --扫描状态
-    scan_result TEXT --扫描结果
+    scan_status      INTEGER, --扫描状态
+    scan_result      TEXT     --扫描结果
+);
+
+
+create table schedule_task
+(
+    task_desc        TEXT, --定时描述
+    asn_number  TEXT, --asn编号
+    asn_desc    TEXT, -- ASN描述
+    crontab_str TEXT, --定时表达式
+    task_config TEXT, --任务配置信息 json配置
+    enable      TEXT, --是否开启
+    task_status TEXT--任务状态
+
+);
+
+-- 调度历史表
+create table schedule_task_hist(
+    schedule_task_id INTEGER, --定时任务ID
+    start_time TEXT, --任务开始时间
+    end_time TEXT, --任务结束时间
+    cost_time INTEGER, --耗时s
+    hist_status TEXT,
+    task_result TEXT --任务结果
 );

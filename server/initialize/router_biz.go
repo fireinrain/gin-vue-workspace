@@ -18,6 +18,7 @@ func initBizRouter(routers ...*gin.RouterGroup) {
 		cfscanRouter := router.RouterGroupApp.Cfscan
 		cfscanRouter.InitAsnInfoRouter(privateGroup, publicGroup)
 		cfscanRouter.InitSubmitScanRouter(privateGroup, publicGroup)
+		cfscanRouter.InitScheduleTaskRouter(privateGroup, publicGroup)
 	}
 
 	holder(publicGroup, privateGroup)

@@ -6,5 +6,5 @@ import (
 )
 
 func bizModel(db *gorm.DB) error {
-	return db.AutoMigrate(cfscan.AsnInfo{}, cfscan.SubmitScan{})
+	return db.AutoMigrate(cfscan.AsnInfo{}, cfscan.SubmitScan{}, cfscan.ScheduleTask{})
 }
