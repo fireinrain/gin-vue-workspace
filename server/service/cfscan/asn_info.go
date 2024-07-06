@@ -7,12 +7,14 @@ import (
 	"github.com/flipped-aurora/gin-vue-admin/server/global"
 	"github.com/flipped-aurora/gin-vue-admin/server/model/cfscan"
 	cfscanReq "github.com/flipped-aurora/gin-vue-admin/server/model/cfscan/request"
+	cfscan_utils "github.com/flipped-aurora/gin-vue-admin/server/utils/cfscan"
 	"go.uber.org/zap"
 	"log"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type AsnInfoService struct{}
@@ -25,7 +27,25 @@ func (asnInfoService *AsnInfoService) CreateAsnInfo(asnInfo *cfscan.AsnInfo) (er
 		return errors.New("ASN name cant be empty or enable cant be 0")
 	}
 	err = global.GVA_DB.Create(asnInfo).Error
-	return err
+	if err != nil {
+		return err
+	}
+
+	//Save CIDR
+	cidrList, err := cfscan_utils.GetCIDRByASN(asnInfo.AsnName)
+	if err != nil {
+		global.GVA_LOG.Error("Error on getting CIDR data of: ", zap.Error(err))
+		return err
+	}
+	cidrData := strings.Join(cidrList, "\n")
+	asnInfo.Ipv4CIDR = cidrData
+	now := time.Now()
+	asnInfo.LastCIDRUpdate = &now
+	if err = global.GVA_DB.Model(&cfscan.AsnInfo{}).Where("id = ?", asnInfo.ID).Updates(&asnInfo).Error; err != nil {
+		global.GVA_LOG.Error("update CIDR data failed: ", zap.Error(err))
+		return err
+	}
+	return nil
 }
 
 func (asnInfoService *AsnInfoService) GetASNDetailByASN(asnInfo *cfscan.AsnInfo) *cfscan.AsnInfo {
