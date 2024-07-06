@@ -133,7 +133,8 @@ create table proxy_ips(
   latency TEXT, --延迟
   tcp_duration INTEGER, --TCP延迟
   enable_tls BOOLEAN, --是否开启tls
-  download_speed TEXT --下载速度
+  download_speed TEXT, --下载速度
+  desc TEXT --ip描述
 
 );
 
