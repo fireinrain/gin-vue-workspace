@@ -4,19 +4,22 @@ import (
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/flipped-aurora/gin-vue-admin/server/model/cfscan"
+	"github.com/flipped-aurora/gin-vue-admin/server/service"
 	"log"
 	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
 )
 
 func TestGetASNDetailByASN(t *testing.T) {
+	infoService := service.ServiceGroupApp.CfscanServiceGroup.AsnInfoService
 	info := cfscan.AsnInfo{
 		AsnName: "AS9999999999",
 	}
-	asn := GetASNDetailByASN(&info)
+	asn := infoService.GetASNDetailByASN(&info)
 
 	fmt.Printf("%v", asn)
 }
@@ -119,14 +122,34 @@ func TestExtractData(t *testing.T) {
 		allocationStatus = strings.Split(allocationStatus, ":")[1]
 		result.AllocationStatus = allocationStatus
 	})
+	//ration with less table data
 	//ratio
 	ratioCSS := "#content-info > div:nth-child(2) > div:nth-child(2) > div:nth-child(2)"
 	doc.Find(ratioCSS).Each(func(i int, s *goquery.Selection) {
 		// Extract text content of the selected element
 		textData := s.Text()
-		trafficRatio := strings.Join(strings.Fields(textData), " ")
-		trafficRatio = strings.Split(trafficRatio, ":")[1]
-		result.TrafficRatio = trafficRatio
+		if strings.Contains(textData, "Website") {
+			website := strings.Join(strings.Fields(textData), " ")
+			website = strings.SplitN(website, ":", 2)[1]
+			result.Website = website
+			return
+		}
+		if strings.Contains(textData, "Traffic Ratio") {
+			trafficRatio := strings.Join(strings.Fields(textData), " ")
+			trafficRatio = strings.Split(trafficRatio, ":")[1]
+			result.TrafficRatio = trafficRatio
+			return
+		}
+	})
+	ratioCSS2 := "#content-info > div:nth-child(2) > div:nth-child(2) > div:nth-child(1)"
+	doc.Find(ratioCSS2).Each(func(i int, s *goquery.Selection) {
+		textData := s.Text()
+		if strings.Contains(textData, "Traffic Ratio") {
+			trafficRatio := strings.Join(strings.Fields(textData), " ")
+			trafficRatio = strings.Split(trafficRatio, ":")[1]
+			result.TrafficRatio = trafficRatio
+			return
+		}
 	})
 	//date
 	dateCSS := "#content-info > div:nth-child(2) > div:nth-child(1) > div:nth-child(3)"
@@ -172,7 +195,7 @@ func TestExtractData(t *testing.T) {
 		// 获取倒数第二个部分（国家代码）
 		if len(pathParts) > 1 {
 			countryCode := strings.ToUpper(strings.TrimSuffix(pathParts[len(pathParts)-1], ".png"))
-			fmt.Println("国家代码:", countryCode)
+			//fmt.Println("国家代码:", countryCode)
 			src = countryCode
 		}
 
@@ -237,4 +260,41 @@ func TestExtractData(t *testing.T) {
 		result.Ipv6Peers = &intValue
 	})
 	println()
+}
+
+func TestExractDataWithRegexo(t *testing.T) {
+	file, err := os.ReadFile("index.html")
+	if err != nil {
+		panic(err)
+	}
+	//println(file)
+	println(ExtractHeaderTitles(string(file)))
+
+}
+
+func ExtractHeaderTitles(html string) (string, string) {
+	// 定义匹配 <h1> 和 <h2> 标签内容的正则表达式模式
+	h1Pattern := `<h1[^>]*>(.*?)<\/h1>`
+	h2Pattern := `<\/h1>.*?<h2[^>]*>(.*?)<\/h2>`
+
+	// 编译正则表达式
+	h1Re := regexp.MustCompile(h1Pattern)
+	h2Re := regexp.MustCompile(h2Pattern)
+
+	// 使用正则表达式查找匹配项
+	h1Match := h1Re.FindStringSubmatch(html)
+	h2Match := h2Re.FindStringSubmatch(html)
+
+	// 初始化标题
+	var h1Title, h2Title string
+
+	// 提取匹配项中的文本内容
+	if len(h1Match) > 1 {
+		h1Title = h1Match[1]
+	}
+	if len(h2Match) > 1 {
+		h2Title = h2Match[1]
+	}
+
+	return h1Title, h2Title
 }
