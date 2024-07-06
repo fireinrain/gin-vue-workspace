@@ -110,3 +110,33 @@ create table schedule_task_hist(
     hist_status TEXT,
     task_result TEXT --任务结果
 );
+
+-- {"ip":"206.237.112.12",
+-- "port":443,
+-- "data_center":"LAX",
+-- "region":"North America",
+-- "city":"Los Angeles",
+-- "latency":"20 ms",
+-- "tcp_duration":20000000,
+-- "enable_tls":true,
+-- "download_speed":"23434 kB/s"}
+--反代ip库表
+-- 入库需要去重
+create table proxy_ips(
+  asn_number TEXT, --asn 名称
+  asn_desc TEXT, --asn描述
+  ip TEXT, --ip
+  port INTEGER, --端口
+  data_center TEXT, -- 数据中心
+  region TEXT, --区域
+  city TEXT, --城市
+  latency TEXT, --延迟
+  tcp_duration INTEGER, --TCP延迟
+  enable_tls BOOLEAN, --是否开启tls
+  download_speed TEXT --下载速度
+
+);
+
+-- 添加联合唯一索引
+CREATE UNIQUE INDEX idx_ip_port ON proxy_ips (ip, port);
+Create INDEX idx_ip ON  proxy_ips(ip,port)
