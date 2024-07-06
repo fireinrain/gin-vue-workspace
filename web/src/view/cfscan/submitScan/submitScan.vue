@@ -265,7 +265,17 @@ const rule = reactive({
                    whitespace: true,
                    message: '不能只输入空格',
                    trigger: ['input', 'blur'],
-              }
+               }],
+  ipinfoType: [{
+    required: false,
+    message: '',
+    trigger: ['input', 'blur'],
+  },
+    {
+      whitespace: true,
+      message: '不能只输入空格',
+      trigger: ['input', 'blur'],
+    }
               ],
                scanPorts : [{
                    required: true,
@@ -324,10 +334,13 @@ const handleScanTypeChange = (value) => {
   if(value === "1" || value === "2"){
     isIpDisabled.value = true
     rule.asnNumber[0]["required"]=true
+    rule.ipinfoType[0]["required"] = false
+
   }
   if(value === "3" || value === "4"){
     isAsnDisabled.value = true
     rule.asnNumber[0]["required"]=false
+    rule.ipinfoType[0]["required"] = true
   }
 }
 
