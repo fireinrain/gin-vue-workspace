@@ -180,15 +180,14 @@ func DoIPScanBackground(submitScan *cfscan.SubmitScan) error {
 					// ... (保持原有的结果处理逻辑不变)
 					//convert sub json list to big json
 					// 创建一个切片来存储去掉方括号的 JSON 对象
-					var jsonObjects []string
-
-					// 遍历每个 JSON 列表并去掉方括号
-					for _, jsonList := range finalResult {
-						jsonObjects = append(jsonObjects, strings.TrimSuffix(strings.TrimPrefix(jsonList, "["), "]"))
+					cleanResultJson, err2 := cfscan_utils.CleanResultJson(finalResult)
+					if err2 != nil {
+						log.Printf("Clean Result Json Error: %s", err2)
+						log.Println("Submit Task finished: Submit RecordID", newRecordId)
+						return
 					}
-
 					// 将所有 JSON 对象用逗号连接起来，并包裹在方括号中
-					mergedJSON := "[" + strings.Join(jsonObjects, ",") + "]"
+					mergedJSON := cleanResultJson
 					sub := cfscan.SubmitScan{
 						ScanResult: mergedJSON,
 						ScanStatus: "2",
@@ -334,15 +333,14 @@ func DoASNScanBackground(submitScan *cfscan.SubmitScan) error {
 					// ... (保持原有的结果处理逻辑不变)
 					//convert sub json list to big json
 					// 创建一个切片来存储去掉方括号的 JSON 对象
-					var jsonObjects []string
-
-					// 遍历每个 JSON 列表并去掉方括号
-					for _, jsonList := range finalResult {
-						jsonObjects = append(jsonObjects, strings.TrimSuffix(strings.TrimPrefix(jsonList, "["), "]"))
+					cleanResultJson, err2 := cfscan_utils.CleanResultJson(finalResult)
+					if err2 != nil {
+						log.Printf("Clean Result Json Error: %s", err2)
+						log.Println("Submit Task finished: Submit RecordID", newRecordId)
+						return
 					}
-
 					// 将所有 JSON 对象用逗号连接起来，并包裹在方括号中
-					mergedJSON := "[" + strings.Join(jsonObjects, ",") + "]"
+					mergedJSON := cleanResultJson
 					sub := cfscan.SubmitScan{
 						ScanResult: mergedJSON,
 						ScanStatus: "2",
@@ -497,15 +495,14 @@ func DoASNSScanBackground(submitScan *cfscan.SubmitScan) error {
 					// ... (保持原有的结果处理逻辑不变)
 					//convert sub json list to big json
 					// 创建一个切片来存储去掉方括号的 JSON 对象
-					var jsonObjects []string
-
-					// 遍历每个 JSON 列表并去掉方括号
-					for _, jsonList := range finalResult {
-						jsonObjects = append(jsonObjects, strings.TrimSuffix(strings.TrimPrefix(jsonList, "["), "]"))
+					cleanResultJson, err2 := cfscan_utils.CleanResultJson(finalResult)
+					if err2 != nil {
+						log.Printf("Clean Result Json Error: %s", err2)
+						log.Println("Submit Task finished: Submit RecordID", newRecordId)
+						return
 					}
-
 					// 将所有 JSON 对象用逗号连接起来，并包裹在方括号中
-					mergedJSON := "[" + strings.Join(jsonObjects, ",") + "]"
+					mergedJSON := cleanResultJson
 					sub := cfscan.SubmitScan{
 						ScanResult: mergedJSON,
 						ScanStatus: "2",
