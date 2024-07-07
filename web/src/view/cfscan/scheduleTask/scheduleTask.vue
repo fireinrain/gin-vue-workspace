@@ -192,9 +192,10 @@ const formData = ref({
         crontabStr: '',
         taskConfig: '',
         enable: '0',
-        taskStatus: '1',
+        taskStatus: '0',
         })
 const configSet = `//请检查好任务配置再提交定时任务
+//Json配置
 {
 
 
@@ -479,7 +480,7 @@ const closeDialog = () => {
         crontabStr: '',
         taskConfig: '',
         enable: '0',
-        taskStatus: '1',
+        taskStatus: '0',
         }
 }
 // 弹窗确定
