@@ -95,7 +95,13 @@
             {{ filterDict(scope.row.enableSpeedtest,IPSpeedTestOptions) }}
             </template>
         </el-table-column>
-        <el-table-column align="left" label="任务状态" prop="scanStatus" width="120">
+          <el-table-column align="left" label="耗时" prop="timeCost" width="120">
+            <template #default="scope">
+              {{calculateTimeDifference(scope.row.CreatedAt,scope.row.UpdatedAt)}}
+            </template>
+          </el-table-column>
+
+          <el-table-column align="left" label="任务状态" prop="scanStatus" width="120">
             <template #default="scope">
             {{ filterDict(scope.row.scanStatus,ScanTaskStatusOptions) }}
             </template>
@@ -345,6 +351,25 @@ const handleScanTypeChange = (value) => {
   }
 }
 
+const calculateTimeDifference = (createdAt, updatedAt) => {
+  const start = new Date(createdAt);
+  const end = new Date(updatedAt);
+  const diffInSeconds = Math.floor((end - start) / 1000);
+
+  const days = Math.floor(diffInSeconds / (3600 * 24));
+  const hours = Math.floor((diffInSeconds % (3600 * 24)) / 3600);
+  const minutes = Math.floor((diffInSeconds % 3600) / 60);
+  const seconds = diffInSeconds % 60;
+
+  let result = [];
+
+  if (days > 0) result.push(`${days}天`);
+  if (hours > 0) result.push(`${hours}小时`);
+  if (minutes > 0) result.push(`${minutes}分钟`);
+  if (seconds > 0) result.push(`${seconds}秒`);
+
+  return result.length > 0 ? result.join('') : '0秒';
+};
 
 
 const searchRule = reactive({
