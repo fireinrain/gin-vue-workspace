@@ -136,7 +136,7 @@
               <el-input v-model="formData.asnDesc" :clearable="true"  placeholder="请输入ASN描述" />
             </el-form-item>
             <el-form-item label="定时表达式:"  prop="crontabStr" >
-              <el-input v-model="formData.crontabStr" :clearable="true"  placeholder="请输入定时表达式" />
+              <el-input v-model="formData.crontabStr" :clearable="true"  placeholder="分钟 小时 日期 月份 星期几,例如: 0 2 * * *" />
             </el-form-item>
 
             <el-form-item label="是否开启:"  prop="enable" >
@@ -150,7 +150,10 @@
               </el-select>
             </el-form-item>
             <el-form-item label="任务配置:"  prop="taskConfig" >
-              <el-input type="textarea" :rows="12" v-model="formData.taskConfig" :clearable="true"  :placeholder=configSetTemp />
+              <el-input type="textarea" :rows="12" v-model="formData.taskConfig" :clearable="true"  :placeholder=configSet />
+            </el-form-item>
+            <el-form-item label="配置模版(复制修改填入左边):" prop="taskConfigTemp" >
+              <el-input type="textarea" :rows="12" disabled v-model="taskConfigTemp" :clearable="true" />
             </el-form-item>
           </el-form>
     </el-drawer>
@@ -191,12 +194,23 @@ const formData = ref({
         enable: '0',
         taskStatus: '1',
         })
-const configSetTemp = `//请检查好任务配置再提交定时任务
+const configSet = `//请检查好任务配置再提交定时任务
 {
 
 
 }
 `
+const taskConfigTemp =  `{
+        "scanDesc": "扫描AS906",
+        "scanType": "1",
+        "asnNumber": "AS906",
+        "ipbatchSize": 100000,
+        "enableTls": "1",
+        "scanPorts": "443",
+        "scanRate": 20000,
+        "ipcheckThread": 100,
+        "enableSpeedtest": "1",
+}`
 
 
 // 验证规则
