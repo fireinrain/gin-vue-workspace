@@ -57,13 +57,13 @@
         >
         <el-table-column type="selection" width="55" />
         
-        <el-table-column align="left" label="日期" prop="createdAt" width="180">
-            <template #default="scope">{{ formatDate(scope.row.CreatedAt) }}</template>
+
+        <el-table-column sortable align="left" label="ID" prop="ID" width="90">
         </el-table-column>
         
         <el-table-column align="left" label="任务描述" prop="taskDesc" width="120" />
-        <el-table-column align="left" label="ASN编号" prop="asnNumber" width="120" />
-        <el-table-column sortable align="left" label="ASN描述" prop="asnDesc" width="120" />
+        <el-table-column sortable align="left" label="ASN编号" prop="asnNumber" width="120" />
+        <el-table-column align="left" label="ASN描述" prop="asnDesc" width="120" />
         <el-table-column align="left" label="定时表达式" prop="crontabStr" width="120" />
         <!--<el-table-column align="left" label="任务配置" prop="taskConfig" width="120" />-->
 
@@ -71,6 +71,9 @@
             <template #default="scope">
             {{ filterDict(scope.row.taskStatus,ScheduleTaskStatusOptions) }}
             </template>
+        </el-table-column>
+        <el-table-column align="left" label="日期" prop="createdAt" width="180">
+          <template #default="scope">{{ formatDate(scope.row.CreatedAt) }}</template>
         </el-table-column>
         <!--<el-table-column align="left" label="是否开启" prop="enable" width="120">-->
         <!--  <template #default="scope">-->
@@ -283,7 +286,7 @@ const searchInfo = ref({})
 // 排序
 const sortChange = ({ prop, order }) => {
   const sortMap = {
-            asnDesc: 'asn_desc',
+            asnNumber: 'asn_number',
   }
 
   let sort = sortMap[prop]

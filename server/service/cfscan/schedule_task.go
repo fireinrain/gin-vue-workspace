@@ -70,7 +70,7 @@ func (scheduleTaskService *ScheduleTaskService) GetScheduleTaskInfoList(info cfs
 	}
 	var OrderStr string
 	orderMap := make(map[string]bool)
-	orderMap["asn_desc"] = true
+	orderMap["asn_number"] = true
 	if orderMap[info.Sort] {
 		OrderStr = info.Sort
 		if info.Order == "descending" {
