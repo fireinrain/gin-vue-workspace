@@ -287,6 +287,7 @@ const searchInfo = ref({})
 const sortChange = ({ prop, order }) => {
   const sortMap = {
             asnNumber: 'asn_number',
+            ID:'id'
   }
 
   let sort = sortMap[prop]

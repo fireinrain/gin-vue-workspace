@@ -68,6 +68,11 @@ func (scheduleTaskService *ScheduleTaskService) GetScheduleTaskInfoList(info cfs
 	if err != nil {
 		return
 	}
+
+	if limit != 0 {
+		db = db.Limit(limit).Offset(offset)
+	}
+
 	var OrderStr string
 	orderMap := make(map[string]bool)
 	orderMap["asn_number"] = true
@@ -77,10 +82,9 @@ func (scheduleTaskService *ScheduleTaskService) GetScheduleTaskInfoList(info cfs
 			OrderStr = OrderStr + " desc"
 		}
 		db = db.Order(OrderStr)
-	}
-
-	if limit != 0 {
-		db = db.Limit(limit).Offset(offset)
+	} else {
+		OrderStr = "id desc"
+		db = db.Order(OrderStr)
 	}
 
 	err = db.Find(&scheduleTasks).Error

@@ -59,11 +59,12 @@
         :data="tableData"
         row-key="ID"
         @selection-change="handleSelectionChange"
+        @sort-change="sortChange"
         >
         <el-table-column type="selection" width="55" />
-
+        <el-table-column sortable align="left" label="ID" prop="ID" width="90" />
         <el-table-column align="left" label="日期" prop="createdAt" width="180">
-            <template #default="scope">{{ formatDate(scope.row.CreatedAt) }}</template>
+          <template #default="scope">{{ formatDate(scope.row.CreatedAt) }}</template>
         </el-table-column>
 
         <el-table-column align="left" label="扫描简介" prop="scanDesc" width="120" />
@@ -72,7 +73,7 @@
             {{ filterDict(scope.row.scanType,CFScanTypeOptions) }}
             </template>
         </el-table-column>
-        <el-table-column align="left" label="ASN编号" prop="asnNumber" width="120" />
+        <el-table-column sortable align="left" label="ASN编号" prop="asnNumber" width="120" />
         <el-table-column align="left" label="IP信息类型" prop="ipinfoType" width="120">
             <template #default="scope">
             {{ filterDict(scope.row.ipinfoType,IPInfoTypeOptions) }}
@@ -371,6 +372,24 @@ const total = ref(0)
 const pageSize = ref(10)
 const tableData = ref([])
 const searchInfo = ref({})
+
+// 排序
+const sortChange = ({ prop, order }) => {
+  const sortMap = {
+    ID: 'id',
+    asnNumber: 'asn_number',
+
+  }
+
+  let sort = sortMap[prop]
+  if(!sort){
+    sort = prop.replace(/[A-Z]/g, match => `_${match.toLowerCase()}`)
+  }
+
+  searchInfo.value.sort = sort
+  searchInfo.value.order = order
+  getTableData()
+}
 
 // 重置
 const onReset = () => {

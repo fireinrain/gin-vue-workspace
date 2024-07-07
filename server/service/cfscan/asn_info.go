@@ -381,7 +381,23 @@ func (asnInfoService *AsnInfoService) GetAsnInfoInfoList(info cfscanReq.AsnInfoS
 	if limit != 0 {
 		db = db.Limit(limit).Offset(offset)
 	}
-	OrderStr := "id desc"
-	err = db.Order(OrderStr).Find(&asnInfos).Error
+	var OrderStr string
+	orderMap := make(map[string]bool)
+	orderMap["id"] = true
+	orderMap["asn_name"] = true
+	orderMap["ipv4_counts"] = true
+
+	if orderMap[info.Sort] {
+		OrderStr = info.Sort
+		if info.Order == "descending" {
+			OrderStr = OrderStr + " desc"
+		}
+		db = db.Order(OrderStr)
+	} else {
+		//默认排序逆序
+		OrderStr = "id desc"
+		db = db.Order(OrderStr)
+	}
+	err = db.Find(&asnInfos).Error
 	return asnInfos, total, err
 }

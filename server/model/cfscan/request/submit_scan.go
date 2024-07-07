@@ -13,4 +13,6 @@ type SubmitScanSearch struct {
 	AsnNumber      string     `json:"asnNumber" form:"asnNumber" `
 	ScanStatus     string     `json:"scanStatus" form:"scanStatus" `
 	request.PageInfo
+	Sort  string `json:"sort" form:"sort"`
+	Order string `json:"order" form:"order"`
 }

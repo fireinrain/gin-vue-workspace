@@ -589,8 +589,23 @@ func (submitScanService *SubmitScanService) GetSubmitScanInfoList(info cfscanReq
 	if limit != 0 {
 		db = db.Limit(limit).Offset(offset)
 	}
-	OrderStr := "id desc"
 
-	err = db.Order(OrderStr).Find(&submitScans).Error
+	var OrderStr string
+	orderMap := make(map[string]bool)
+	orderMap["id"] = true
+	orderMap["asn_number"] = true
+
+	if orderMap[info.Sort] {
+		OrderStr = info.Sort
+		if info.Order == "descending" {
+			OrderStr = OrderStr + " desc"
+		}
+		db = db.Order(OrderStr)
+	} else {
+		//默认排序逆序
+		OrderStr = "id desc"
+		db = db.Order(OrderStr)
+	}
+	err = db.Find(&submitScans).Error
 	return submitScans, total, err
 }

@@ -33,7 +33,7 @@
               placeholder="分配国家"
           />
         </el-form-item>
-      
+
 
         <template v-if="showAllQuery">
           <!-- 将需要控制显示状态的查询条件添加到此范围内 -->
@@ -60,16 +60,16 @@
         :data="tableData"
         row-key="ID"
         @selection-change="handleSelectionChange"
+        @sort-change="sortChange"
         >
         <el-table-column type="selection" width="55" />
-        
-        <el-table-column align="left" label="日期" prop="createdAt" width="180">
-            <template #default="scope">{{ formatDate(scope.row.CreatedAt) }}</template>
-        </el-table-column>
-        
-        <el-table-column align="left" label="ASN名称" prop="asnName" width="120" />
+
+
+        <el-table-column sortable align="left" label="ID" prop="ID" width="90" />
+
+        <el-table-column sortable align="left" label="ASN名称" prop="asnName" width="120" />
         <el-table-column align="left" label="ASN全名" prop="fullName" width="120" />
-        <el-table-column align="left" label="IPV4数量" prop="ipv4Counts" width="120" />
+        <el-table-column sortable align="left" label="IPV4数量" prop="ipv4Counts" width="120" />
         <!--<el-table-column align="left" label="IPV6数量" prop="ipv6Counts" width="120" />-->
         <!--<el-table-column align="left" label="节点数量" prop="peersCounts" width="120" />-->
         <!--<el-table-column align="left" label="IPV4节点数量" prop="ipv4Peers" width="120" />-->
@@ -85,6 +85,7 @@
         <el-table-column align="left" label="官方网址" prop="website" width="120" />
         <el-table-column align="left" label="分配国家" prop="allocationCountry" width="120" />
         <!--<el-table-column align="left" label="IPV4 CIDR" prop="ipv4CIDR" width="120" />-->
+
         <el-table-column
             align="left"
             label="启用"
@@ -103,6 +104,9 @@
          <el-table-column align="left" label="CIDR最后更新时间" prop="lastCIDRUpdate" width="180">
             <template #default="scope">{{ formatDate(scope.row.lastCIDRUpdate) }}</template>
          </el-table-column>
+          <el-table-column align="left" label="日期" prop="createdAt" width="180">
+            <template #default="scope">{{ formatDate(scope.row.CreatedAt) }}</template>
+          </el-table-column>
         <el-table-column align="left" label="操作" fixed="right" min-width="240">
             <template #default="scope">
             <el-button type="primary" link icon="edit" class="table-button" @click="updateAsnInfoFunc(scope.row)">变更</el-button>
@@ -384,6 +388,25 @@ const total = ref(0)
 const pageSize = ref(10)
 const tableData = ref([])
 const searchInfo = ref({})
+
+// 排序
+const sortChange = ({ prop, order }) => {
+  const sortMap = {
+    ID: 'id',
+    asnName: 'asn_name',
+    ipv4Counts: 'ipv4_counts'
+
+  }
+
+  let sort = sortMap[prop]
+  if(!sort){
+    sort = prop.replace(/[A-Z]/g, match => `_${match.toLowerCase()}`)
+  }
+
+  searchInfo.value.sort = sort
+  searchInfo.value.order = order
+  getTableData()
+}
 
 // 重置
 const onReset = () => {
