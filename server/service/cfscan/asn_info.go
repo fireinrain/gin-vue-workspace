@@ -48,6 +48,13 @@ func (asnInfoService *AsnInfoService) CreateAsnInfo(asnInfo *cfscan.AsnInfo) (er
 	return nil
 }
 
+// GetASNDetailByASN
+// 实际上有api 但是数据分布在好几个api上
+//
+//	@Description: 当前使用网页解析并不优雅
+//	@receiver asnInfoService
+//	@param asnInfo
+//	@return *cfscan.AsnInfo
 func (asnInfoService *AsnInfoService) GetASNDetailByASN(asnInfo *cfscan.AsnInfo) *cfscan.AsnInfo {
 	result := asnInfo
 	asnName := asnInfo.AsnName
@@ -64,7 +71,10 @@ func (asnInfoService *AsnInfoService) GetASNDetailByASN(asnInfo *cfscan.AsnInfo)
 	}
 
 	// Set User-Agent header
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
+	req.Header.Set("User-Agent", "curl/7.68.0")
+	req.Header.Set("Accept", "*/*")
+	req.Header.Set("Host", "bgpview.io")
+	req.Header.Set("Connection", "keep-alive")
 
 	// Create a client
 	client := &http.Client{}
