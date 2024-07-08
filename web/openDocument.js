@@ -3,19 +3,19 @@
      未经授权的商用使用可能会被我们的资产搜索引擎爬取，并可能导致后续索赔。索赔金额将不低于高级授权费的十倍。请您遵守版权法律法规，尊重知识产权。
 */
 
-var child_process = require('child_process')
-
-var url = 'https://www.gin-vue-admin.com'
-var cmd = ''
-console.log(process.platform)
-switch (process.platform) {
-  case 'win32':
-    cmd = 'start'
-    child_process.exec(cmd + ' ' + url)
-    break
-
-  case 'darwin':
-    cmd = 'open'
-    child_process.exec(cmd + ' ' + url)
-    break
-}
+// var child_process = require('child_process')
+//
+// var url = 'https://www.gin-vue-admin.com'
+// var cmd = ''
+// console.log(process.platform)
+// switch (process.platform) {
+//   case 'win32':
+//     cmd = 'start'
+//     child_process.exec(cmd + ' ' + url)
+//     break
+//
+//   case 'darwin':
+//     cmd = 'open'
+//     child_process.exec(cmd + ' ' + url)
+//     break
+// }
