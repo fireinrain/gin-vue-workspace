@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"net"
 	"net/http"
 	"os"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -106,6 +108,12 @@ func SplitIntoMaxBatches(cidrs []string, maxBatches int) [][]string {
 	return result
 }
 
+// GetCIDRByASN
+//
+//	@Description: 通过ASN name获取cidr字符串列表
+//	@param asnName
+//	@return []string
+//	@return error
 func GetCIDRByASN(asnName string) ([]string, error) {
 	asn := asnName // 替换为实际的ASN值
 	asn = strings.ReplaceAll(asn, "AS", "")
@@ -151,6 +159,11 @@ func GetCIDRByASN(asnName string) ([]string, error) {
 	return output, nil
 }
 
+// GetCIDRByASN2File
+//
+//	@Description: 用asn编号获取cidr并写入文件
+//	@param asnName
+//	@param filePath
 func GetCIDRByASN2File(asnName string, filePath string) {
 	byASNData, err := GetCIDRByASN(asnName)
 	if err != nil {
@@ -173,7 +186,7 @@ func GetCIDRByASN2File(asnName string, filePath string) {
 
 // ExtractIPv4Addresses
 //
-//	@Description: 从字符串中抽取ip
+//	@Description: 从字符串中抽取ipv4 列表
 //	@param input
 //	@return []string
 func ExtractIPv4Addresses(input string) []string {
@@ -190,6 +203,11 @@ func ExtractIPv4Addresses(input string) []string {
 	return matches
 }
 
+// ExtractIPv4CIDRAddresses
+//
+//	@Description: 从CIDR字符串中抽取ipv4 CIDR列表
+//	@param input
+//	@return []string
 func ExtractIPv4CIDRAddresses(input string) []string {
 	// IPv4 CIDR 地址的正则表达式模式
 	// 这个模式匹配 IPv4 地址，后跟一个斜杠和 0-32 之间的数字
@@ -218,6 +236,12 @@ type CFIPTestResult struct {
 	DownloadSpeed string        `json:"download_speed"` // 下载速度
 }
 
+// CleanResultJson
+//
+//	@Description: 清理测试结果json字符串 包含去重
+//	@param taskResults
+//	@return string
+//	@return error
 func CleanResultJson(taskResults []string) (string, error) {
 	//去除重复的IP
 	seenIPs := make(map[string]bool)
@@ -231,7 +255,7 @@ func CleanResultJson(taskResults []string) (string, error) {
 		}
 		//去重标准是 ip+端口
 		for _, r := range cfResult {
-			port := string(r.Port)
+			port := strconv.Itoa(r.Port)
 			if !seenIPs[r.IP+port] {
 				seenIPs[r.IP+port] = true
 				uniqueRecords = append(uniqueRecords, r)
@@ -246,4 +270,94 @@ func CleanResultJson(taskResults []string) (string, error) {
 	}
 	return string(marshal), nil
 
+}
+
+const (
+	earthRadiusKm = 6371 // 地球平均半径（公里）
+	//深圳福田 北纬 东经
+	localGeo = "22.5455,114.0683" //使用者本地GEO
+)
+
+// 将角度转换为弧度
+func toRadians(degrees float64) float64 {
+	return degrees * math.Pi / 180
+}
+
+// CaculateGeoIPDist
+//
+//	@Description: 使用经纬度计算两地之间的物理距离
+//	@param sourceGeoStr
+//	@param targetGeoStr
+//	@return float64
+func CaculateGeoIPDist(sourceGeoStr string, targetGeoStr string) float64 {
+	geo1 := strings.Split(sourceGeoStr, ",")
+	lat1, _ := strconv.ParseFloat(strings.TrimSpace(geo1[0]), 64)
+	lon1, _ := strconv.ParseFloat(strings.TrimSpace(geo1[1]), 64)
+
+	geo2 := strings.Split(targetGeoStr, ",")
+	lat2, _ := strconv.ParseFloat(strings.TrimSpace(geo2[0]), 64)
+	lon2, _ := strconv.ParseFloat(strings.TrimSpace(geo2[1]), 64)
+
+	lat1 = toRadians(lat1)
+	lon1 = toRadians(lon1)
+	lat2 = toRadians(lat2)
+	lon2 = toRadians(lon2)
+
+	dlat := lat2 - lat1
+	dlon := lon2 - lon1
+
+	a := math.Sin(dlat/2)*math.Sin(dlat/2) +
+		math.Cos(lat1)*math.Cos(lat2)*
+			math.Sin(dlon/2)*math.Sin(dlon/2)
+	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
+
+	distance := earthRadiusKm * c
+	return distance
+}
+
+//
+// CaculateGeoIPDistFromLocal
+//  @Description: 计算ip到本地的物理距离
+//  @param targetGeoStr
+//  @return float64
+//
+
+func CaculateGeoIPDistFromLocal(targetGeoStr string) float64 {
+	return CaculateGeoIPDist(localGeo, targetGeoStr)
+}
+
+// ipinfo.io/[IP address]?token=958278ec91a07c
+const IPInfoIOToken = "958278ec91a07c"
+
+// node info
+// 启动时 自动获取hostname
+// 并且请求ipinfo.io 获取当前ip geo的一些信息
+type IPGeoInfo struct {
+	IP       string `json:"ip"`
+	Hostname string `json:"hostname"`
+	City     string `json:"city"`
+	Region   string `json:"region"`
+	Country  string `json:"country"`
+	Loc      string `json:"loc"`
+	Org      string `json:"org"`
+	Postal   string `json:"postal"`
+	Timezone string `json:"timezone"`
+}
+
+func FetchIPGeoInfoByIP(ipStr string) (*IPGeoInfo, error) {
+	// 发出 HTTP 请求
+	resp, err := http.Get("https://ipinfo.io/" + ipStr + "?token=" + IPInfoIOToken)
+	if err != nil {
+		fmt.Println("Error fetch ip geo info:", err)
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	// 读取响应数据
+	var ipInfo IPGeoInfo
+	if err := json.NewDecoder(resp.Body).Decode(&ipInfo); err != nil {
+		fmt.Println("Error on decode json to struct:", err)
+		return nil, err
+	}
+	return &ipInfo, nil
 }

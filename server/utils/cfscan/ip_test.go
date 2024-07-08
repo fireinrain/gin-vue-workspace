@@ -228,3 +228,22 @@ func TestSplitCIDRs(t *testing.T) {
 	rs := SplitCIDRs(cidr, 100000)
 	println(len(rs))
 }
+
+func TestCaculateGeoIPDistFromLocal(t *testing.T) {
+	local := CaculateGeoIPDistFromLocal("39.9042,116.4074")
+	fmt.Printf("北京和深圳之间的距离约为 %.2f 公里\n", local)
+	fmt.Println(local)
+}
+
+func TestFetchIPGeoInfoByIP(t *testing.T) {
+	ip, err := FetchIPGeoInfoByIP("60.246.169.181")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("%v", ip)
+
+	local := CaculateGeoIPDistFromLocal(ip.Loc)
+	fmt.Printf("澳门和深圳之间的距离约为 %.2f 公里\n", local)
+
+	fmt.Println(local)
+}
