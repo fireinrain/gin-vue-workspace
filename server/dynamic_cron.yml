@@ -1,0 +1,10 @@
+configs:
+  - cron_id: 22
+    cronspec: "* * * * *"
+    task_type: "cron-scan:cron-scan-asn"
+    task_payload: "我是任务22"
+
+  - cron_id: 12
+    cronspec: "* * * * *"
+    task_type: "cron-scan:cron-scan-asn"
+    task_payload: "我是任务12"

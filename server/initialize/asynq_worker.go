@@ -10,22 +10,26 @@ import (
 	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
 	"go.uber.org/zap"
+	"gopkg.in/yaml.v2"
 	"log"
+	"os"
 	"strings"
 	"time"
 )
 
 const redisAddr = "cloud2.131433.xyz:5379"
+const redisPass = "fireinrain@redis"
+const redisDb = 0
 
 func AsynQClient() *asynq.Client {
-	redisClientOpt := asynq.RedisClientOpt{Addr: redisAddr, Password: "fireinrain@redis", DB: 0}
+	redisClientOpt := asynq.RedisClientOpt{Addr: redisAddr, Password: redisPass, DB: redisDb}
 	client := asynq.NewClient(redisClientOpt)
 	return client
 	//defer client.Close()
 }
 
 func AsynQInspector() *asynq.Inspector {
-	redisClientOpt := asynq.RedisClientOpt{Addr: redisAddr, Password: "fireinrain@redis", DB: 0}
+	redisClientOpt := asynq.RedisClientOpt{Addr: redisAddr, Password: redisPass, DB: redisDb}
 	inspector := asynq.NewInspector(redisClientOpt)
 	return inspector
 }
@@ -39,7 +43,7 @@ func SelfAsynQTaskClientRun() {
 			panic(err)
 		}
 		scheduler := asynq.NewScheduler(
-			asynq.RedisClientOpt{Addr: redisAddr, Password: "fireinrain@redis", DB: 0},
+			asynq.RedisClientOpt{Addr: redisAddr, Password: redisPass, DB: redisDb},
 
 			&asynq.SchedulerOpts{
 				Location: loc,
@@ -57,7 +61,7 @@ func SelfAsynQTaskClientRun() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		log.Printf("registered an scheduler entry: %q\n", entryID)
+		log.Printf("本地注册定时任务: scheduler entry: %q\n", entryID)
 		if err := scheduler.Run(); err != nil {
 			log.Fatal(err)
 		}
@@ -65,25 +69,84 @@ func SelfAsynQTaskClientRun() {
 	go func() {
 
 		srv := asynq.NewServer(
-			asynq.RedisClientOpt{Addr: redisAddr, Password: "fireinrain@redis", DB: 0},
+			asynq.RedisClientOpt{Addr: redisAddr, Password: redisPass, DB: redisDb},
 			asynq.Config{
 				// Specify how many concurrent workers to use
 				Concurrency: 3,
 				// Optionally specify multiple queues with different priority.
 				Queues: map[string]int{
-					"self-admin": 6,
+					"cron-scan":  6,
+					"self-admin": 3,
 				},
 				// See the godoc for other configuration options
 			},
 		)
 		mux := asynq.NewServeMux()
-		mux.Handle(TypeUpdateASNInfoCIDR, NewBashTaskRunProcessor())
-		log.Println(">>> 注册AsynQ-Wokrer成功...")
+		mux.Handle(TypeUpdateASNInfoCIDR, NewUpdateCIDRRunProcessor())
+		//定时分发扫描ASN的任务
+		mux.Handle(TypeDistributeCronASNScan, NewDistributeCronASNScanProcessor())
+		log.Println(">>> 注册本地AsynQ-Wokrer成功...")
 		if err := srv.Run(mux); err != nil {
 			log.Fatalf("could not run server: %v", err)
 		}
 	}()
 
+	//动态定时任务分发器
+	go func() {
+		provider := &FileBasedConfigProvider{filename: "dynamic_cron.yml"}
+
+		mgr, err := asynq.NewPeriodicTaskManager(
+			asynq.PeriodicTaskManagerOpts{
+				RedisConnOpt:               asynq.RedisClientOpt{Addr: redisAddr, Password: redisPass, DB: redisDb},
+				PeriodicTaskConfigProvider: provider,         // this provider object is the interface to your config source
+				SyncInterval:               10 * time.Second, // this field specifies how often sync should happen
+			})
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Println(">>> 动态定时任务管理器启动成功...")
+
+		if err := mgr.Run(); err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+}
+
+//动态任务管理器
+
+// FileBasedConfigProvider 实现（与之前相同）
+// FileBasedConfigProvider implements asynq.PeriodicTaskConfigProvider interface.
+type FileBasedConfigProvider struct {
+	filename string
+}
+
+// GetConfigs Parses the yaml file and return a list of PeriodicTaskConfigs.
+func (p *FileBasedConfigProvider) GetConfigs() ([]*asynq.PeriodicTaskConfig, error) {
+	data, err := os.ReadFile(p.filename)
+	if err != nil {
+		return nil, err
+	}
+	var c PeriodicTaskConfigContainer
+	if err := yaml.Unmarshal(data, &c); err != nil {
+		return nil, err
+	}
+	var configs []*asynq.PeriodicTaskConfig
+	for _, cfg := range c.Configs {
+		configs = append(configs, &asynq.PeriodicTaskConfig{Cronspec: cfg.Cronspec, Task: asynq.NewTask(cfg.TaskType, []byte(cfg.TaskPayload), asynq.Queue("cron-scan"))})
+	}
+	return configs, nil
+}
+
+type PeriodicTaskConfigContainer struct {
+	Configs []*Config `yaml:"configs"`
+}
+
+type Config struct {
+	CronId      string `json:"cron_id"`
+	Cronspec    string `yaml:"cronspec"`
+	TaskType    string `yaml:"task_type"`
+	TaskPayload string `yaml:"task_payload"`
 }
 
 //custom self run task here
@@ -124,7 +187,7 @@ func (processor *UpdateCIDRRunProcessor) ProcessTask(ctx context.Context, task *
 	return nil
 }
 
-func NewBashTaskRunProcessor() *UpdateCIDRRunProcessor {
+func NewUpdateCIDRRunProcessor() *UpdateCIDRRunProcessor {
 	return &UpdateCIDRRunProcessor{}
 }
 
@@ -154,4 +217,31 @@ func DoBashRun(ctx context.Context, task *asynq.Task, payload UpdateASNInfoCIDR)
 
 	}
 	return nil, nil
+}
+
+// TypeDistributeCronASNScan 定时任务分发 任务
+const TypeDistributeCronASNScan = "cron-scan:cron-scan-asn"
+
+// DistributeCronASNScanProcessor implements asynq.Handler interface.
+type DistributeCronASNScanProcessor struct {
+}
+
+func (processor *DistributeCronASNScanProcessor) ProcessTask(ctx context.Context, task *asynq.Task) error {
+	//var payload UpdateASNInfoCIDR
+	//if err := json.Unmarshal(task.Payload(), &payload); err != nil {
+	//	return fmt.Errorf("json.Unmarshal failed: %v: %w", err, asynq.SkipRetry)
+	//}
+	//
+	//log.Printf("Doing update CIDR task=%s--%s", payload.UUID, payload.TimeStamp)
+	//// Do scan stuff
+	//_, err := DoBashRun(ctx, task, payload)
+	//if err != nil {
+	//	return fmt.Errorf("failed to process task: %v", err)
+	//}
+	log.Println("接收到定时任务参数: ", string(task.Payload()))
+	return nil
+}
+
+func NewDistributeCronASNScanProcessor() *DistributeCronASNScanProcessor {
+	return &DistributeCronASNScanProcessor{}
 }
