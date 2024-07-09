@@ -276,6 +276,22 @@ func (cfm *ConfigFileManager) DeleteTaskByID(id uint) error {
 	return cfm.WriteYAMLFile(configFile)
 }
 
+// QueryTaskByID 根据ID查询任务
+func (cfm *ConfigFileManager) QueryTaskByID(id uint) (*Config, error) {
+	configFile, err := cfm.ReadYAMLFile()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, task := range configFile.Configs {
+		if task.CronId == id {
+			return task, nil
+		}
+	}
+
+	return nil, fmt.Errorf("task with ID %d not found", id)
+}
+
 // InsertTask 插入新任务到YAML文件
 func (cfm *ConfigFileManager) InsertTask(newTask Config) error {
 	configFile, err := cfm.ReadYAMLFile()
