@@ -72,9 +72,7 @@
             {{ filterDict(scope.row.taskStatus,ScheduleTaskStatusOptions) }}
             </template>
         </el-table-column>
-        <el-table-column align="left" label="日期" prop="createdAt" width="180">
-          <template #default="scope">{{ formatDate(scope.row.CreatedAt) }}</template>
-        </el-table-column>
+
         <!--<el-table-column align="left" label="是否开启" prop="enable" width="120">-->
         <!--  <template #default="scope">-->
         <!--    {{ filterDict(scope.row.enable,EnableOrNotOptions) }}-->
@@ -95,6 +93,16 @@
               />
             </template>
           </el-table-column>
+          <el-table-column align="left" label="创建日期" prop="createdAt" width="180">
+            <template #default="scope">{{ formatDate(scope.row.CreatedAt) }}</template>
+          </el-table-column>
+          <el-table-column align="left" label="最后运行日期" prop="lastRunAt" width="180">
+            <template #default="scope">{{ formatDate(scope.row.lastRunAt) }}</template>
+          </el-table-column>
+          <el-table-column align="left" label="下次运行日期" prop="createdAt" width="180">
+            <template #default="scope">{{ formatDate(scope.row.nextRunAt) }}</template>
+          </el-table-column>
+
         <el-table-column align="left" label="操作" fixed="right" min-width="240">
             <template #default="scope">
             <el-button type="primary" link icon="edit" class="table-button" @click="updateScheduleTaskFunc(scope.row)">变更</el-button>

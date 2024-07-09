@@ -6,11 +6,13 @@ import (
 	"github.com/flipped-aurora/gin-vue-admin/server/global"
 	"github.com/flipped-aurora/gin-vue-admin/server/model/cfscan"
 	cfscanReq "github.com/flipped-aurora/gin-vue-admin/server/model/cfscan/request"
+	cfscanUtils "github.com/flipped-aurora/gin-vue-admin/server/utils/cfscan"
 	"gopkg.in/yaml.v2"
 	"log"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type ScheduleTaskService struct{}
@@ -26,6 +28,10 @@ func (scheduleTaskService *ScheduleTaskService) CreateScheduleTask(scheduleTask 
 	if scheduleTask.Enable != "0" || scheduleTask.TaskStatus != "0" {
 		return errors.New("新建定时任务的状态必须为禁用中和非开启状态")
 	}
+	//设置为1970 时间戳
+	unixEpoch := time.Unix(0, 0)
+	scheduleTask.LastRunAt = unixEpoch
+	scheduleTask.NextRunAt = unixEpoch
 	err = global.GVA_DB.Create(scheduleTask).Error
 	if err != nil {
 		log.Printf(">>> Create schedule task failed: %s", err)
@@ -111,6 +117,12 @@ func (scheduleTaskService *ScheduleTaskService) UpdateScheduleTask(scheduleTask 
 	if scheduleTask.Enable == "0" {
 		scheduleTask.TaskStatus = "0"
 	}
+	//获取定时任务表达式 使用当前时间 + 表达式时间
+	nextRunTime, err := cfscanUtils.NextRunTime(scheduleTask.CrontabStr)
+	if err != nil {
+		return errors.New("无法计算定时任务下一次运行时间")
+	}
+	scheduleTask.NextRunAt = nextRunTime
 	err = global.GVA_DB.Model(&cfscan.ScheduleTask{}).Where("id = ?", scheduleTask.ID).Updates(&scheduleTask).Error
 	if err != nil {
 		log.Printf(">>> Update schedule task failed: %s", err)
