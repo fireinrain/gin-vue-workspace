@@ -353,7 +353,17 @@ const rule = reactive({
                    whitespace: true,
                    message: '不能只输入空格',
                    trigger: ['input', 'blur'],
-              }
+              },
+               {
+                 validator: (rule, value, callback) => {
+                   const regex = /^AS\d+$/
+                   if (!regex.test(value)) {
+                     callback(new Error('ASN 名称必须以 AS 开头，后跟纯数字'))
+                   } else {
+                     callback()
+                   }
+                 }
+               },
               ],
                enable : [{
                    required: true,
