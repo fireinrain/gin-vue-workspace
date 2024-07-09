@@ -334,6 +334,11 @@ func (asnInfoService *AsnInfoService) GetASNDetailByASN(asnInfo *cfscan.AsnInfo)
 // DeleteAsnInfo 删除asnInfo表记录
 // Author [piexlmax](https://github.com/piexlmax)
 func (asnInfoService *AsnInfoService) DeleteAsnInfo(ID string) (err error) {
+	enableFlag := 1
+	asnInfo := cfscan.AsnInfo{Enable: &enableFlag}
+	//将enable状态设置为0
+	err = global.GVA_DB.Model(&cfscan.AsnInfo{}).Where("id = ?", ID).Updates(&asnInfo).Error
+
 	err = global.GVA_DB.Delete(&cfscan.AsnInfo{}, "id = ?", ID).Error
 	return err
 }
@@ -341,6 +346,13 @@ func (asnInfoService *AsnInfoService) DeleteAsnInfo(ID string) (err error) {
 // DeleteAsnInfoByIds 批量删除asnInfo表记录
 // Author [piexlmax](https://github.com/piexlmax)
 func (asnInfoService *AsnInfoService) DeleteAsnInfoByIds(IDs []string) (err error) {
+	for _, id := range IDs {
+		enableFlag := 1
+		asnInfo := cfscan.AsnInfo{Enable: &enableFlag}
+		//将enable状态设置为0
+		err = global.GVA_DB.Model(&cfscan.AsnInfo{}).Where("id = ?", id).Updates(&asnInfo).Error
+
+	}
 	err = global.GVA_DB.Delete(&[]cfscan.AsnInfo{}, "id in ?", IDs).Error
 	return err
 }
