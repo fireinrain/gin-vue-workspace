@@ -20,6 +20,7 @@ import (
 const redisAddr = "cloud2.131433.xyz:5379"
 const redisPass = "fireinrain@redis"
 const redisDb = 0
+const dynamicCronFile = "dynamic_cron.yml"
 
 func AsynQClient() *asynq.Client {
 	redisClientOpt := asynq.RedisClientOpt{Addr: redisAddr, Password: redisPass, DB: redisDb}
@@ -93,7 +94,7 @@ func SelfAsynQTaskClientRun() {
 
 	//动态定时任务分发器
 	go func() {
-		provider := &FileBasedConfigProvider{filename: "dynamic_cron.yml"}
+		provider := &FileBasedConfigProvider{filename: dynamicCronFile}
 
 		mgr, err := asynq.NewPeriodicTaskManager(
 			asynq.PeriodicTaskManagerOpts{
@@ -111,6 +112,31 @@ func SelfAsynQTaskClientRun() {
 		}
 	}()
 
+}
+
+func StartAllCronTaskFromDB() {
+	var scheduleTasks []cfscan.ScheduleTask
+	db := global.GVA_DB.Model(&cfscan.ScheduleTask{})
+	db = db.Where("enable = ?", 1)
+	result := db.Find(&scheduleTasks)
+	if result.RowsAffected == 0 {
+		global.GVA_LOG.Info("数据库中没有开启的Schedule Task...")
+		return
+	}
+	configFileManager := NewConfigFileManager(dynamicCronFile)
+	var configs []Config
+	for _, scheduleTask := range scheduleTasks {
+		//查询出所有开启的schedule task 然后写入dynamic_cron.yml
+		c := Config{
+			CronId:      scheduleTask.ID,
+			Cronspec:    scheduleTask.CrontabStr,
+			TaskType:    TypeDistributeCronASNScan,
+			TaskPayload: scheduleTask.TaskConfig,
+		}
+		configs = append(configs, c)
+	}
+	configFileManager.CreateYAMLFile(configs)
+	global.GVA_LOG.Info("初始化扫描ASN定时任务完成...")
 }
 
 //动态任务管理器
@@ -143,14 +169,138 @@ type PeriodicTaskConfigContainer struct {
 }
 
 type Config struct {
-	CronId      string `json:"cron_id"`
+	CronId      uint   `json:"cron_id"`
 	Cronspec    string `yaml:"cronspec"`
 	TaskType    string `yaml:"task_type"`
 	TaskPayload string `yaml:"task_payload"`
 }
 
-//custom self run task here
+// ConfigFileManager 实现 增删改查 yml节点的方法
+type ConfigFileManager struct {
+	ConfigFilePath string `json:"config_file_path"`
+}
 
+type ConfigFile struct {
+	Configs []*Config `yaml:"configs"`
+}
+
+func NewConfigFileManager(configFilePath string) *ConfigFileManager {
+	return &ConfigFileManager{ConfigFilePath: configFilePath}
+}
+
+// ReadYAMLFile 读取YAML文件
+func (cfm *ConfigFileManager) ReadYAMLFile() (*ConfigFile, error) {
+	data, err := os.ReadFile(cfm.ConfigFilePath)
+	if err != nil {
+		return nil, err
+	}
+
+	var configFile ConfigFile
+	err = yaml.Unmarshal(data, &configFile)
+	if err != nil {
+		return nil, err
+	}
+
+	return &configFile, nil
+}
+
+// WriteYAMLFile 写入YAML文件
+func (cfm *ConfigFileManager) WriteYAMLFile(configFile *ConfigFile) error {
+	data, err := yaml.Marshal(configFile)
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(cfm.ConfigFilePath, data, 0644)
+}
+
+// UpdateTaskByID 根据ID更新YAML文件中的任务
+func (cfm *ConfigFileManager) UpdateTaskByID(id uint, newTask Config) error {
+	configFile, err := cfm.ReadYAMLFile()
+	if err != nil {
+		return err
+	}
+
+	found := false
+	for i, task := range configFile.Configs {
+		if task.CronId == id {
+			configFile.Configs[i] = &newTask
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("task with ID %d not found", id)
+	}
+
+	return cfm.WriteYAMLFile(configFile)
+}
+
+// CreateYAMLFile 创建新的YAML文件
+func (cfm *ConfigFileManager) CreateYAMLFile(tasks []Config) error {
+	var r []*Config
+	for _, task := range tasks {
+		r = append(r, &task)
+	}
+	configFile := ConfigFile{Configs: r}
+	return cfm.WriteYAMLFile(&configFile)
+}
+
+// DeleteTaskByID 根据ID从YAML文件中删除任务
+func (cfm *ConfigFileManager) DeleteTaskByID(id uint) error {
+	configFile, err := cfm.ReadYAMLFile()
+	if err != nil {
+		return err
+	}
+
+	newConfigs := make([]Config, 0)
+	found := false
+	for _, task := range configFile.Configs {
+		if task.CronId != id {
+			newConfigs = append(newConfigs, *task)
+		} else {
+			found = true
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("task with ID %d not found", id)
+	}
+	var cs []*Config
+	for _, config := range newConfigs {
+		cs = append(cs, &config)
+	}
+
+	configFile.Configs = cs
+	return cfm.WriteYAMLFile(configFile)
+}
+
+// InsertTask 插入新任务到YAML文件
+func (cfm *ConfigFileManager) InsertTask(newTask Config) error {
+	configFile, err := cfm.ReadYAMLFile()
+	if err != nil {
+		// 如果文件不存在，创建一个新的配置文件
+		if os.IsNotExist(err) {
+			return cfm.CreateYAMLFile([]Config{newTask})
+		}
+		return err
+	}
+
+	// 检查是否已存在相同ID的任务
+	for _, task := range configFile.Configs {
+		if task.CronId == newTask.CronId {
+			return fmt.Errorf("task with ID %d already exists", newTask.CronId)
+		}
+	}
+
+	// 添加新任务
+	configFile.Configs = append(configFile.Configs, &newTask)
+
+	return cfm.WriteYAMLFile(configFile)
+}
+
+// TypeUpdateASNInfoCIDR custom self run task here
 const TypeUpdateASNInfoCIDR = "self-admin:updateCIDR"
 
 type UpdateASNInfoCIDR struct {

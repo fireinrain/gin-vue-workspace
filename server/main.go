@@ -40,6 +40,7 @@ func main() {
 	}
 
 	initialize.SelfAsynQTaskClientRun() //注册asynq本地server
+	initialize.StartAllCronTaskFromDB()
 
 	core.RunWindowsServer()
 }
