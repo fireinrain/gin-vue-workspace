@@ -1,6 +1,6 @@
 configs:
 - cronid: 1
-  cronspec: 0 12 * * *
+  cronspec: 0 8 * * *
   task_type: cron-scan:cron-scan-asn
   task_payload: |-
     {
@@ -15,7 +15,7 @@ configs:
             "enableSpeedtest": "1",
     }
 - cronid: 2
-  cronspec: 0 0 * * *
+  cronspec: 0 1 * * *
   task_type: cron-scan:cron-scan-asn
   task_payload: |-
     {
