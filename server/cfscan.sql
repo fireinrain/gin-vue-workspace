@@ -97,7 +97,7 @@ create table schedule_task
     crontab_str TEXT, --定时表达式
     task_config TEXT, --任务配置信息 json配置
     enable      TEXT, --是否开启
-    task_status TEXT--任务状态
+    task_status TEXT--任务状态 0禁用1空闲2队列中3运行中
 
 );
 
@@ -107,7 +107,7 @@ create table schedule_task_hist(
     start_time TEXT, --任务开始时间
     end_time TEXT, --任务结束时间
     cost_time INTEGER, --耗时s
-    hist_status TEXT,
+    hist_status TEXT, --调度历史状态 1进行中 2已完成 3已超时
     task_result TEXT --任务结果
 );
 
@@ -124,7 +124,7 @@ create table schedule_task_hist(
 -- 入库需要去重
 create table proxy_ips(
   asn_number TEXT, --asn 名称
-  asn_desc TEXT, --asn描述
+
   ip TEXT, --ip
   port INTEGER, --端口
   data_center TEXT, -- 数据中心
@@ -133,11 +133,39 @@ create table proxy_ips(
   latency TEXT, --延迟
   tcp_duration INTEGER, --TCP延迟
   enable_tls BOOLEAN, --是否开启tls
-  download_speed TEXT, --下载速度
-  desc TEXT --ip描述
+  download_speed TEXT --下载速度
 
 );
 
 -- 添加联合唯一索引
 CREATE UNIQUE INDEX idx_ip_port ON proxy_ips (ip, port);
-Create INDEX idx_ip ON  proxy_ips(ip,port)
+Create INDEX idx_ip ON  proxy_ips(ip,port);
+
+
+
+
+-- 经过检测的IP代理池
+-- 从proxy_ips 查询出来检测更新
+
+create table alived_proxy_ips(
+     asn_number TEXT, --asn 名称
+     asn_desc TEXT, --asn描述
+     ip TEXT, --ip
+     port INTEGER, --端口
+     enable_tls BOOLEAN, --是否开启tls
+     geo_distance INTEGER --物理距离
+     data_center TEXT, -- 数据中心
+     region TEXT, --区域
+     city TEXT, --城市
+     latency TEXT, --延迟
+     tcp_duration INTEGER, --TCP延迟
+     download_speed TEXT, --下载速度
+     ttl INTEGER, --存活时间
+     desc TEXT --ip描述
+);
+
+-- 添加联合唯一索引
+CREATE UNIQUE INDEX idx_ip_port ON alived_proxy_ips (ip, port);
+Create INDEX idx_ip ON  alived_proxy_ips(ip,port);
+
+

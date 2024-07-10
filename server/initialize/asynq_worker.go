@@ -13,6 +13,7 @@ import (
 	"gopkg.in/yaml.v2"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -94,6 +95,7 @@ func SelfAsynQTaskClientRun() {
 
 	//动态定时任务分发器
 	go func() {
+		time.Sleep(5 * time.Second)
 		provider := &FileBasedConfigProvider{filename: dynamicCronFile}
 
 		mgr, err := asynq.NewPeriodicTaskManager(
@@ -114,7 +116,61 @@ func SelfAsynQTaskClientRun() {
 
 }
 
+type CronTaskPayload struct {
+	SchedulerTaskID string `json:"scheduler_task_id"`
+	CronTaskStr     string `json:"cron_task_str"`
+	ScanDesc        string `json:"scanDesc"`
+	ScanType        string `json:"scanType"`
+	AsnNumber       string `json:"asnNumber"`
+	IpbatchSize     int    `json:"ipbatchSize"`
+	EnableTls       string `json:"enableTls"`
+	ScanPorts       string `json:"scanPorts"`
+	ScanRate        int    `json:"scanRate"`
+	IpcheckThread   int    `json:"ipcheckThread"`
+	EnableSpeedtest string `json:"enableSpeedtest"`
+}
+
 func StartAllCronTaskFromDB() {
+	// 开始事务
+	tx := global.GVA_DB.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+			log.Println(">>> transaction rolled back due to panic:", r)
+		}
+	}()
+
+	//重置提交任务 中的状态
+	upResult0 := tx.Model(&cfscan.SubmitScan{}).Where("scan_status = ?", "1").Update("scan_status", "3")
+	if upResult0.Error != nil {
+		log.Println(">>> Failed to update SubmitScan scan_status:", upResult0.Error)
+		tx.Rollback()
+		return
+	}
+	//设置scheduleTaskHist 全部设置为超时(3) 因为服务器进行了重启
+
+	// 更新所有 HistStatus 为 "1" 的记录，将其修改为 "3"
+	upResult := tx.Model(&cfscan.ScheduleTaskHist{}).Where("hist_status = ?", "1").Update("hist_status", "3")
+	if upResult.Error != nil {
+		log.Println(">>> Failed to update ScheduleTaskHist hist_status:", upResult.Error)
+		tx.Rollback()
+		return
+	}
+	//重置定时任务 中的状态
+	upResult2 := tx.Model(&cfscan.ScheduleTask{}).Where("task_status = ? OR task_status = ?", "2", "3").Update("task_status", "1")
+	if upResult2.Error != nil {
+		log.Println(">>> Failed to update ScheduleTask task_status:", upResult.Error)
+		tx.Rollback()
+		return
+	}
+	// 提交事务
+	if err := tx.Commit().Error; err != nil {
+		log.Println(">>> Failed to commit update scheduleTaskHist and submit scan status:", err)
+		tx.Rollback()
+		return
+	}
+	log.Printf(">>> 服务重启成功,已将进行中的的定时任务记录设置为超时,数量: %d\n", upResult.RowsAffected)
+
 	var scheduleTasks []cfscan.ScheduleTask
 	db := global.GVA_DB.Model(&cfscan.ScheduleTask{})
 	db = db.Where("enable = ?", 1)
@@ -126,17 +182,28 @@ func StartAllCronTaskFromDB() {
 	configFileManager := NewConfigFileManager(dynamicCronFile)
 	var configs []Config
 	for _, scheduleTask := range scheduleTasks {
+		//marshall the payload json
+		var cronTaskPayload CronTaskPayload
+		err := json.Unmarshal([]byte(scheduleTask.TaskConfig), &cronTaskPayload)
+		if err != nil {
+			log.Printf(">>> Unmarshal json to struct failed: %v\n", err)
+			continue
+		}
+		cronTaskPayload.SchedulerTaskID = strconv.Itoa(int(scheduleTask.ID))
+		cronTaskPayload.CronTaskStr = scheduleTask.CrontabStr
+		cronTaskPayloadStr, _ := json.Marshal(cronTaskPayload)
 		//查询出所有开启的schedule task 然后写入dynamic_cron.yml
 		c := Config{
 			CronId:      scheduleTask.ID,
 			Cronspec:    scheduleTask.CrontabStr,
 			TaskType:    TypeDistributeCronASNScan,
-			TaskPayload: scheduleTask.TaskConfig,
+			TaskPayload: string(cronTaskPayloadStr),
 		}
 		configs = append(configs, c)
 	}
 	configFileManager.CreateYAMLFile(configs)
-	global.GVA_LOG.Info("初始化扫描ASN定时任务完成...")
+	log.Println(">>> 初始化扫描ASN定时任务完成...")
+
 }
 
 //动态任务管理器
@@ -393,6 +460,53 @@ type DistributeCronASNScanProcessor struct {
 }
 
 func (processor *DistributeCronASNScanProcessor) ProcessTask(ctx context.Context, task *asynq.Task) error {
+	log.Printf("定时任务: %s触发,接收到定时任务参数: %s \n", task.Type(), string(task.Payload()))
+	//修改schedule task 任务状态为进行中 并且将下一次运行的时间更新上
+	// 开始事务
+	tx := global.GVA_DB.Begin()
+
+	// 确保事务在执行完后关闭
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+	var cronTaskPayload CronTaskPayload
+	//payload to struct
+	_ = json.Unmarshal(task.Payload(), &cronTaskPayload)
+	cronTaskId := cronTaskPayload.SchedulerTaskID
+	cronTaskIdInt, _ := strconv.Atoi(cronTaskId)
+	nextRunTime, _ := NextRunTime(cronTaskPayload.CronTaskStr)
+	updateTask := cfscan.ScheduleTask{
+		TaskStatus: "",
+		NextRunAt:  nextRunTime,
+	}
+	// 更新操作
+	if err := tx.Model(&cfscan.ScheduleTask{}).Where("id = ?", cronTaskId).Updates(&updateTask).Error; err != nil {
+		tx.Rollback()
+		log.Fatalf(">>> Update ScheduleTask failed: %v", err)
+	}
+
+	// 插入操作
+	newScheduleTaskHist := cfscan.ScheduleTaskHist{
+		ASNName:        cronTaskPayload.AsnNumber,
+		ScheduleTaskId: cronTaskIdInt,
+		StartTime:      time.Now(),
+		HistStatus:     "1", //运行中
+	}
+	if err := tx.Model(&cfscan.ScheduleTaskHist{}).Create(&newScheduleTaskHist).Error; err != nil {
+		tx.Rollback()
+		log.Fatalf("Insert failed: %v", err)
+	}
+
+	// 提交事务
+	if err := tx.Commit().Error; err != nil {
+		log.Fatalf(">>> Transaction commit failed: %v", err)
+	}
+
+	fmt.Println(">>> Transaction(update scheduleTask and insert scheduleTaskHist) completed successfully")
+
+	//分发ASN扫描任务 等待结果 更新数据
 	//var payload UpdateASNInfoCIDR
 	//if err := json.Unmarshal(task.Payload(), &payload); err != nil {
 	//	return fmt.Errorf("json.Unmarshal failed: %v: %w", err, asynq.SkipRetry)
@@ -404,7 +518,6 @@ func (processor *DistributeCronASNScanProcessor) ProcessTask(ctx context.Context
 	//if err != nil {
 	//	return fmt.Errorf("failed to process task: %v", err)
 	//}
-	log.Println("接收到定时任务参数: ", string(task.Payload()))
 	return nil
 }
 
