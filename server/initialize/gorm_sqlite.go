@@ -18,6 +18,7 @@ func GormSqlite() *gorm.DB {
 	if db, err := gorm.Open(sqlite.Open(s.Dsn()), internal.Gorm.Config(s.Prefix, s.Singular)); err != nil {
 		panic(err)
 	} else {
+		db = db.Debug()
 		sqlDB, _ := db.DB()
 		sqlDB.SetMaxIdleConns(s.MaxIdleConns)
 		sqlDB.SetMaxOpenConns(s.MaxOpenConns)
