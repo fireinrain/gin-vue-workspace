@@ -4,4 +4,5 @@ type RouterGroup struct {
 	AsnInfoRouter
 	SubmitScanRouter
 	ScheduleTaskRouter
+	ScheduleTaskHistRouter
 }

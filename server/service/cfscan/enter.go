@@ -4,4 +4,5 @@ type ServiceGroup struct {
 	AsnInfoService
 	SubmitScanService
 	ScheduleTaskService
+	ScheduleTaskHistService
 }

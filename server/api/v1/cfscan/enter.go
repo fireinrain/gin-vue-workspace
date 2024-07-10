@@ -4,4 +4,5 @@ type ApiGroup struct {
 	AsnInfoApi
 	SubmitScanApi
 	ScheduleTaskApi
+	ScheduleTaskHistApi
 }
