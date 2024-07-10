@@ -218,7 +218,7 @@ const taskConfigTemp =  `{
         "scanPorts": "443",
         "scanRate": 20000,
         "ipcheckThread": 100,
-        "enableSpeedtest": "1",
+        "enableSpeedtest": "1"
 }`
 
 
