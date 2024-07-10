@@ -200,8 +200,8 @@
             <el-option v-for="(item,key) in ScanTaskStatusOptions" :key="key" :label="item.label" :value="item.value"/>
           </el-select>
         </el-form-item>
-        <el-form-item label="任务结果:" prop="scanResult">
-          <el-input :rows="16" type="textarea" v-model="formData.scanResult" :clearable="true"
+        <el-form-item class="full-width" label="任务结果:" prop="scanResult">
+          <el-input :rows="12" type="textarea" v-model="formData.scanResult" :clearable="true"
                     placeholder="请输入任务结果"/>
         </el-form-item>
       </el-form>
@@ -650,5 +650,7 @@ const enterDialog = async () => {
 .row-form .el-form-item {
   width: 48%;
 }
-
+.row-form .el-form-item.full-width {
+  width: 100%;
+}
 </style>
