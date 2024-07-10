@@ -78,6 +78,9 @@ func (scheduleTaskHistService *ScheduleTaskHistService) GetScheduleTaskHistInfoL
 			OrderStr = OrderStr + " desc"
 		}
 		db = db.Order(OrderStr)
+	} else {
+		OrderStr = "id desc"
+		db = db.Order(OrderStr)
 	}
 
 	if limit != 0 {

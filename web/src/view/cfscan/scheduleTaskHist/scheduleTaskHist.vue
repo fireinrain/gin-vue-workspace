@@ -59,13 +59,11 @@
         >
         <el-table-column type="selection" width="55" />
         
-        <el-table-column align="left" label="日期" prop="createdAt" width="180">
-            <template #default="scope">{{ formatDate(scope.row.CreatedAt) }}</template>
-        </el-table-column>
-        
+
+        <el-table-column align="left" label="ID" prop="ID" width="90" />
         <el-table-column align="left" label="ASN名称" prop="asnName" width="120" />
         <el-table-column align="left" label="定时任务ID" prop="scheduleTaskId" width="120" />
-         <el-table-column sortable align="left" label="起始时间" prop="startTime" width="180">
+        <el-table-column sortable align="left" label="起始时间" prop="startTime" width="180">
             <template #default="scope">{{ formatDate(scope.row.startTime) }}</template>
          </el-table-column>
          <el-table-column align="left" label="结束时间" prop="endTime" width="180">
@@ -76,6 +74,9 @@
             <template #default="scope">
             {{ filterDict(scope.row.histStatus,ScheduleHistStatusOptions) }}
             </template>
+        </el-table-column>
+        <el-table-column align="left" label="日期" prop="createdAt" width="180">
+          <template #default="scope">{{ formatDate(scope.row.CreatedAt) }}</template>
         </el-table-column>
         <el-table-column align="left" label="任务结果" prop="taskResult" width="120" />
         <el-table-column align="left" label="操作" fixed="right" min-width="240">
