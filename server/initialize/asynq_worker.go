@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	tasks "github.com/endless-cfcdn/shared-tasks"
 	"github.com/flipped-aurora/gin-vue-admin/server/global"
 	"github.com/flipped-aurora/gin-vue-admin/server/model/cfscan"
 	cfscan_utils "github.com/flipped-aurora/gin-vue-admin/server/utils/cfscan"
@@ -11,10 +12,13 @@ import (
 	"github.com/hibiken/asynq"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v2"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"log"
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -22,6 +26,13 @@ const redisAddr = "cloud2.131433.xyz:5379"
 const redisPass = "fireinrain@redis"
 const redisDb = 0
 const dynamicCronFile = "dynamic_cron.yml"
+
+var astkCtx context.Context
+var taskCancel context.CancelFunc
+
+func init() {
+	astkCtx, taskCancel = context.WithCancel(context.Background())
+}
 
 func AsynQClient() *asynq.Client {
 	redisClientOpt := asynq.RedisClientOpt{Addr: redisAddr, Password: redisPass, DB: redisDb}
@@ -150,18 +161,62 @@ func StartAllCronTaskFromDB() {
 	//设置scheduleTaskHist 全部设置为超时(3) 因为服务器进行了重启
 
 	// 更新所有 HistStatus 为 "1" 的记录，将其修改为 "3"
-	upResult := tx.Model(&cfscan.ScheduleTaskHist{}).Where("hist_status = ?", "1").Update("hist_status", "3")
-	if upResult.Error != nil {
-		log.Println(">>> Failed to update ScheduleTaskHist hist_status:", upResult.Error)
+	// 获取当前时间
+	now := time.Now()
+
+	// 更新所有 hist_status 为 "1" 的记录
+	var taskHists []cfscan.ScheduleTaskHist
+	err := tx.Model(&cfscan.ScheduleTaskHist{}).Where("hist_status = ?", "1").Find(&taskHists).Error
+	if err != nil {
+		log.Fatalf("查询错误: %v", err)
+	}
+
+	for _, taskHist := range taskHists {
+		taskHist.HistStatus = "3"
+		taskHist.EndTime = now
+		taskHist.CostTime = int(now.Sub(taskHist.StartTime).Seconds())
+
+		err = tx.Model(&cfscan.ScheduleTaskHist{}).Where("id = ?", taskHist.ID).Updates(&taskHist).Error
+		if err != nil {
+			log.Printf("更新ScheduleTaskHist错误: %v", err)
+			// 处理错误，例如记录错误日志或回滚事务
+			break
+		}
+	}
+
+	if err != nil {
+		log.Println(">>> Failed to update ScheduleTaskHist hist_status:", err)
 		tx.Rollback()
 		return
 	}
 	//重置定时任务 中的状态
 	upResult2 := tx.Model(&cfscan.ScheduleTask{}).Where("task_status = ? OR task_status = ?", "2", "3").Update("task_status", "1")
 	if upResult2.Error != nil {
-		log.Println(">>> Failed to update ScheduleTask task_status:", upResult.Error)
+		log.Println(">>> Failed to update ScheduleTask task_status:", upResult2.Error)
 		tx.Rollback()
 		return
+	}
+	//更新task_status=1 的下次运行时间
+	var tasks []cfscan.ScheduleTask
+	if err := tx.Where("enable = ? AND task_status = ?", "1", "1").Find(&tasks).Error; err != nil {
+		tx.Rollback()
+		log.Println(">>> Failed to find ScheduleTask records:", err)
+		return
+	}
+
+	for _, task := range tasks {
+		nextRunAt, err := NextRunTime(task.CrontabStr)
+		if err != nil {
+			tx.Rollback()
+			log.Println(">>> Failed to calculate next run at:", err)
+			return
+		}
+
+		if err := tx.Model(&cfscan.ScheduleTask{}).Where("id = ?", task.ID).Update("next_run_at", nextRunAt).Error; err != nil {
+			tx.Rollback()
+			log.Println(">>> Failed to update record:", err)
+			return
+		}
 	}
 	// 提交事务
 	if err := tx.Commit().Error; err != nil {
@@ -169,7 +224,7 @@ func StartAllCronTaskFromDB() {
 		tx.Rollback()
 		return
 	}
-	log.Printf(">>> 服务重启成功,已将进行中的的定时任务记录设置为超时,数量: %d\n", upResult.RowsAffected)
+	log.Printf(">>> 服务重启成功,已将进行中的的定时任务记录设置为超时,数量: %d\n", len(taskHists))
 
 	var scheduleTasks []cfscan.ScheduleTask
 	db := global.GVA_DB.Model(&cfscan.ScheduleTask{})
@@ -461,6 +516,23 @@ type DistributeCronASNScanProcessor struct {
 
 func (processor *DistributeCronASNScanProcessor) ProcessTask(ctx context.Context, task *asynq.Task) error {
 	log.Printf("定时任务: %s触发,接收到定时任务参数: %s \n", task.Type(), string(task.Payload()))
+	ctx, cancel := context.WithTimeout(astkCtx, 12*time.Hour)
+
+	var cronTaskPayload CronTaskPayload
+	//payload to struct
+	_ = json.Unmarshal(task.Payload(), &cronTaskPayload)
+	cronTaskId := cronTaskPayload.SchedulerTaskID
+	cronTaskIdInt, _ := strconv.Atoi(cronTaskId)
+	//如果此时有cronTaskID 相同 但是未完成的扫描 直接返回
+	var taskHist cfscan.ScheduleTaskHist
+
+	result := global.GVA_DB.Model(&cfscan.ScheduleTaskHist{}).
+		Where("schedule_task_id = ? and hist_status = ?", cronTaskIdInt, "1").
+		Order("id desc").First(&taskHist)
+	if result.RowsAffected != 0 {
+		log.Println("当前定时任务ID存在未完成的任务调度记录,请仔细检查...")
+		return nil
+	}
 	//修改schedule task 任务状态为进行中 并且将下一次运行的时间更新上
 	// 开始事务
 	tx := global.GVA_DB.Begin()
@@ -471,14 +543,10 @@ func (processor *DistributeCronASNScanProcessor) ProcessTask(ctx context.Context
 			tx.Rollback()
 		}
 	}()
-	var cronTaskPayload CronTaskPayload
-	//payload to struct
-	_ = json.Unmarshal(task.Payload(), &cronTaskPayload)
-	cronTaskId := cronTaskPayload.SchedulerTaskID
-	cronTaskIdInt, _ := strconv.Atoi(cronTaskId)
+
 	nextRunTime, _ := NextRunTime(cronTaskPayload.CronTaskStr)
 	updateTask := cfscan.ScheduleTask{
-		TaskStatus: "",
+		TaskStatus: "3",
 		NextRunAt:  nextRunTime,
 	}
 	// 更新操作
@@ -503,21 +571,281 @@ func (processor *DistributeCronASNScanProcessor) ProcessTask(ctx context.Context
 	if err := tx.Commit().Error; err != nil {
 		log.Fatalf(">>> Transaction commit failed: %v", err)
 	}
-
-	fmt.Println(">>> Transaction(update scheduleTask and insert scheduleTaskHist) completed successfully")
+	log.Println(">>> Transaction(update scheduleTask and insert scheduleTaskHist) completed successfully")
 
 	//分发ASN扫描任务 等待结果 更新数据
-	//var payload UpdateASNInfoCIDR
-	//if err := json.Unmarshal(task.Payload(), &payload); err != nil {
-	//	return fmt.Errorf("json.Unmarshal failed: %v: %w", err, asynq.SkipRetry)
-	//}
-	//
-	//log.Printf("Doing update CIDR task=%s--%s", payload.UUID, payload.TimeStamp)
-	//// Do scan stuff
-	//_, err := DoBashRun(ctx, task, payload)
-	//if err != nil {
-	//	return fmt.Errorf("failed to process task: %v", err)
-	//}
+	var asnInfo cfscan.AsnInfo
+	tx = global.GVA_DB.Where("asn_name = ?", cronTaskPayload.AsnNumber).Find(&asnInfo)
+	if tx.RowsAffected == 0 {
+		log.Printf(">>> 当前ASN编号不在数据库中,请确保ASN编号已经存在ASNInfo表中")
+		cronTaskIdUInt := uint(cronTaskIdInt)
+		err := updateScheduleTaskStatusAndTime(global.GVA_DB, cronTaskIdUInt, cronTaskPayload.CronTaskStr)
+		log.Printf(">>> 更新定时任务和定时任务记录状态失败: %s\n", err)
+		return err
+	}
+	waitForProcess := strings.Split(asnInfo.Ipv4CIDR, "\n")
+	//这里需要限制 最大批量数为25
+	batchedCIDRS := cfscan_utils.SplitCIDRs(waitForProcess, cronTaskPayload.IpbatchSize)
+
+	taskBatchSize := len(batchedCIDRS)
+	log.Printf("本次扫描任务将分成: %d 个小扫描任务\n", taskBatchSize)
+
+	//time.Sleep(5 * time.Second) 模拟运行完
+	//重新设置scheduleTask状态为1,并更新最后运行时间 下一次运行时间
+	//查找最新一条 Hist记录 并且更新scheduleTaskHist记录为完成(2)
+
+	var wg sync.WaitGroup
+	results := make(chan string, taskBatchSize)
+	for index, cidr := range batchedCIDRS {
+		wg.Add(1)
+		go func(index int, cidr []string) {
+			defer wg.Done()
+			select {
+			case <-ctx.Done():
+				// 超时或被取消
+				log.Printf("当前任务: %d 已超时,分发任务已取消运行...\n", index)
+				return
+			default:
+				var enableSpeedtest int = 1
+				if cronTaskPayload.EnableSpeedtest == "0" {
+					enableSpeedtest = 0
+				}
+				payload := tasks.ASNScanCFPayload{
+					AsnNumber:       cronTaskPayload.AsnNumber,
+					EnableTls:       cronTaskPayload.EnableTls,
+					ScanPorts:       cronTaskPayload.ScanPorts,
+					ScanRate:        cronTaskPayload.ScanRate,
+					IpcheckThread:   cronTaskPayload.IpcheckThread,
+					EnableSpeedtest: enableSpeedtest,
+					CIDRList:        cidr,
+					IPBatchSize:     cronTaskPayload.IpbatchSize,
+				}
+				runTask, _ := tasks.NewASNScanCFTask(payload)
+
+				info, err := global.AsynQClient.EnqueueContext(ctx, runTask)
+				if err != nil {
+					log.Printf("Enqueue error: %v", err)
+					return
+				}
+				log.Printf("enqueued task: id=%s queue=%s", info.ID, info.Queue)
+
+				// 等待任务完成
+				for {
+					select {
+					case <-ctx.Done():
+						// 超时或被取消
+						log.Printf("当前任务: %s已超时,任务等待结果已取消运行...\n", info.ID)
+						return
+					default:
+						taskInfo, err := global.AsynQInspector.GetTaskInfo("default", info.ID)
+						result := taskInfo.Result
+
+						if result == nil {
+							time.Sleep(5 * time.Second)
+							continue
+						}
+						if err != nil {
+							log.Printf("Error getting task info: %v", err)
+						}
+						log.Printf("Batch Task(%d/%d): %s,运行完成：\n", index, taskBatchSize, info.ID)
+						results <- string(result)
+						return
+					}
+				}
+			}
+		}(index, cidr)
+	}
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+	go func() {
+		defer cancel()
+		// 收集结果
+		var finalResult []string
+		for {
+			select {
+			case <-ctx.Done():
+				// 超时或被取消，更新扫描状态为超时
+				cronTaskIdUInt := uint(cronTaskIdInt)
+
+				err := updateScheduleTaskStatusAndTime(global.GVA_DB, cronTaskIdUInt, cronTaskPayload.CronTaskStr)
+				if err != nil {
+					log.Printf("Error on update ScheduleTask status and time")
+				}
+
+				log.Printf("Batch Task cancled due to the timeout on waiting result: ScheduleTask: %d", cronTaskIdUInt)
+				return
+			case result, ok := <-results:
+				if !ok {
+					// 通道已关闭，所有结果已收集完毕
+					// ... (保持原有的结果处理逻辑不变)
+					//convert sub json list to big json
+					// 创建一个切片来存储去掉方括号的 JSON 对象
+					cleanResultJson, err2 := cfscan_utils.CleanResultJsonE(finalResult)
+					if err2 != nil {
+						log.Printf("Clean Result Json Error: %s", err2)
+						log.Printf("Schedule Task finished: %d, %s\n", cronTaskPayload.SchedulerTaskID, cronTaskPayload.CronTaskStr)
+						return
+					}
+					// 开始事务
+					tx := global.GVA_DB.Begin()
+					// 更新scheduleTask 状态
+					var task cfscan.ScheduleTask
+					if err := tx.Model(&cfscan.ScheduleTask{}).First(&task, cronTaskIdInt).Error; err != nil {
+						tx.Rollback()
+						return
+					}
+
+					// 设置新的LastRunAt和NextRunAt时间
+					nextRunAt, _ := NextRunTime(cronTaskPayload.CronTaskStr)
+
+					// 更新字段
+					task.TaskStatus = "1"
+					task.LastRunAt = task.NextRunAt
+					task.NextRunAt = nextRunAt
+
+					if err := tx.Model(&cfscan.ScheduleTask{}).Where("id = ?", task.ID).Updates(&task).Error; err != nil {
+						tx.Rollback()
+						return
+					}
+					//更新ScheduleTaskHist
+					//更新scheduleTaskHist
+					// 查询 ScheduleTaskId 对应的最新一条记录
+					var taskHist cfscan.ScheduleTaskHist
+					cronTaskIdUInt := uint(cronTaskIdInt)
+					err := tx.Model(&cfscan.ScheduleTaskHist{}).Where("schedule_task_id = ?", cronTaskIdUInt).
+						Order("id DESC").
+						First(&taskHist).Error
+					if err != nil {
+						tx.Rollback()
+						return
+					}
+
+					// 更新 HistStatus 为 "3"，设置 EndTime 并计算 CostTime
+					now := time.Now()
+					taskHist.HistStatus = "2"
+					taskHist.EndTime = now
+					taskHist.CostTime = int(now.Sub(taskHist.StartTime).Seconds())
+					taskHist.TaskResult = cleanResultJson
+
+					// 保存更新
+					err = tx.Model(&cfscan.ScheduleTaskHist{}).Where("id = ?", taskHist.ID).Updates(&taskHist).Error
+					if err != nil {
+						tx.Rollback()
+						return
+					}
+					// 提交事务
+					if err := tx.Commit().Error; err != nil {
+						fmt.Printf(">>> Failed to commit ScheduleTask transaction: %s", err)
+						return
+					}
+
+					mergedJSON := cleanResultJson
+
+					//保存到反代IP数据库
+					var speedTestResultES []cfscan.SpeedTestResultE
+					err2 = json.Unmarshal([]byte(mergedJSON), &speedTestResultES)
+					if err != nil {
+						log.Printf("Error on unmarshal merged result json: %s\n", err.Error())
+					}
+					//append to proxy_ips
+					var proxy_ips []cfscan.ProxyIps
+					for _, r := range speedTestResultES {
+						enableTLS := "0"
+						if r.EnableTLS {
+							enableTLS = "1"
+						}
+						p := cfscan.ProxyIps{
+							AsnNumber:     r.AsnNumber,
+							Ip:            r.IP,
+							Port:          r.Port,
+							EnableTls:     enableTLS,
+							DataCenter:    r.DataCenter,
+							Region:        r.Region,
+							City:          r.City,
+							Latency:       r.Latency,
+							TcpDuration:   strconv.FormatInt(int64(r.TcpDuration), 10),
+							DownloadSpeed: r.DownloadSpeed,
+						}
+						proxy_ips = append(proxy_ips, p)
+					}
+					// 使用 ON CONFLICT DO NOTHING 跳过冲突的记录
+					if err := global.GVA_DB.Model(&cfscan.ProxyIps{}).Clauses(clause.OnConflict{DoNothing: true}).Create(&proxy_ips).Error; err != nil {
+						log.Println("Failed to insert asn scan result to proxy_ips:", err)
+					}
+					log.Printf("Schedule Task finished: %d, %s\n", cronTaskPayload.SchedulerTaskID, cronTaskPayload.CronTaskStr)
+
+					return
+				}
+				if result != "EmptyResult" {
+					finalResult = append(finalResult, result)
+				}
+			}
+		}
+
+	}()
+
+	return nil
+}
+
+func updateScheduleTaskStatusAndTime(db *gorm.DB, cronTaskID uint, cronStr string) error {
+	// 开始事务
+	tx := db.Begin()
+
+	var task cfscan.ScheduleTask
+	if err := tx.Model(&cfscan.ScheduleTask{}).First(&task, cronTaskID).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf(">>> Failed to find ScheduleTask record: %w", err)
+	}
+
+	// 设置新的LastRunAt和NextRunAt时间
+	now := time.Now()
+	nextRunAt, err := NextRunTime(cronStr)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf(">>> Failed to calculate next run at: %w", err)
+	}
+
+	// 更新字段
+	task.TaskStatus = "1"
+	task.LastRunAt = now
+	task.NextRunAt = nextRunAt
+
+	if err := tx.Model(&cfscan.ScheduleTask{}).Where("id = ?", task.ID).Updates(&task).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf(">>> Failed to update ScheduleTask record: %w", err)
+	}
+
+	//更新scheduleTaskHist
+	// 查询 ScheduleTaskId 对应的最新一条记录
+	var taskHist cfscan.ScheduleTaskHist
+	err = db.Model(&cfscan.ScheduleTaskHist{}).Where("schedule_task_id = ?", cronTaskID).
+		Order("id DESC").
+		First(&taskHist).Error
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("查询定时任务历史错误: %v", err)
+	}
+
+	// 更新 HistStatus 为 "3"，设置 EndTime 并计算 CostTime
+	now = time.Now()
+	taskHist.HistStatus = "3"
+	taskHist.EndTime = now
+	taskHist.CostTime = int(now.Sub(taskHist.StartTime).Seconds())
+
+	// 保存更新
+	err = db.Model(&cfscan.ScheduleTaskHist{}).Save(&taskHist).Error
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("更新定时任务历史错误: %v", err)
+	}
+	// 提交事务
+	if err := tx.Commit().Error; err != nil {
+		return fmt.Errorf(">>> Failed to commit ScheduleTask transaction: %w", err)
+	}
+
 	return nil
 }
 

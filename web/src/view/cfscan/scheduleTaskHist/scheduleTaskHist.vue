@@ -69,7 +69,11 @@
          <el-table-column align="left" label="结束时间" prop="endTime" width="180">
             <template #default="scope">{{ formatDate(scope.row.endTime) }}</template>
          </el-table-column>
-        <el-table-column sortable align="left" label="耗时" prop="costTime" width="120" />
+        <el-table-column sortable align="left" label="耗时" prop="costTime" width="120">
+          <template #default="scope">
+          {{ formatCostTime(scope.row.costTime) }}
+          </template>
+        </el-table-column>
         <el-table-column align="left" label="任务状态" prop="histStatus" width="120">
             <template #default="scope">
             {{ filterDict(scope.row.histStatus,ScheduleHistStatusOptions) }}
@@ -78,7 +82,7 @@
         <el-table-column align="left" label="日期" prop="createdAt" width="180">
           <template #default="scope">{{ formatDate(scope.row.CreatedAt) }}</template>
         </el-table-column>
-        <el-table-column align="left" label="任务结果" prop="taskResult" width="120" />
+        <!--<el-table-column align="left" label="任务结果" prop="taskResult" width="120" />-->
         <el-table-column align="left" label="操作" fixed="right" min-width="240">
             <template #default="scope">
             <el-button type="primary" link icon="edit" class="table-button" @click="updateScheduleTaskHistFunc(scope.row)">变更</el-button>
@@ -193,6 +197,26 @@ const searchRule = reactive({
     }, trigger: 'change' }
   ],
 })
+
+const formatCostTime = (seconds)=> {
+  const years = Math.floor(seconds / (365 * 24 * 3600));
+  seconds %= 365 * 24 * 3600;
+  const days = Math.floor(seconds / (24 * 3600));
+  seconds %= 24 * 3600;
+  const hours = Math.floor(seconds / 3600);
+  seconds %= 3600;
+  const minutes = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+
+  const parts = [];
+  if (years > 0) parts.push(`${years}年`);
+  if (days > 0) parts.push(`${days}天`);
+  if (hours > 0) parts.push(`${hours}小时`);
+  if (minutes > 0) parts.push(`${minutes}分钟`);
+  if (secs > 0) parts.push(`${secs}秒`);
+
+  return parts.length > 0 ? parts.join('') : '0秒';
+}
 
 const elFormRef = ref()
 const elSearchFormRef = ref()
