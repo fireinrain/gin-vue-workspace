@@ -20,6 +20,7 @@ func initBizRouter(routers ...*gin.RouterGroup) {
 		cfscanRouter.InitSubmitScanRouter(privateGroup, publicGroup)
 		cfscanRouter.InitScheduleTaskRouter(privateGroup, publicGroup)
 		cfscanRouter.InitScheduleTaskHistRouter(privateGroup, publicGroup)
+		cfscanRouter.InitProxyIpsRouter(privateGroup, publicGroup)
 	}
 
 	holder(publicGroup, privateGroup)

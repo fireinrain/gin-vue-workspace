@@ -5,4 +5,5 @@ type ApiGroup struct {
 	SubmitScanApi
 	ScheduleTaskApi
 	ScheduleTaskHistApi
+	ProxyIpsApi
 }

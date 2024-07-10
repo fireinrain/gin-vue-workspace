@@ -5,4 +5,5 @@ type ServiceGroup struct {
 	SubmitScanService
 	ScheduleTaskService
 	ScheduleTaskHistService
+	ProxyIpsService
 }
