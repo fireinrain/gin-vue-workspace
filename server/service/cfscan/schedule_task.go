@@ -1,6 +1,7 @@
 package cfscan
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/flipped-aurora/gin-vue-admin/server/global"
@@ -104,6 +105,20 @@ func (scheduleTaskService *ScheduleTaskService) DeleteScheduleTaskByIds(IDs []st
 	return err
 }
 
+type CronTaskPayload struct {
+	SchedulerTaskID string `json:"scheduler_task_id"`
+	CronTaskStr     string `json:"cron_task_str"`
+	ScanDesc        string `json:"scanDesc"`
+	ScanType        string `json:"scanType"`
+	AsnNumber       string `json:"asnNumber"`
+	IpbatchSize     int    `json:"ipbatchSize"`
+	EnableTls       string `json:"enableTls"`
+	ScanPorts       string `json:"scanPorts"`
+	ScanRate        int    `json:"scanRate"`
+	IpcheckThread   int    `json:"ipcheckThread"`
+	EnableSpeedtest string `json:"enableSpeedtest"`
+}
+
 // UpdateScheduleTask 更新scheduleTask表记录
 // Author [piexlmax](https://github.com/piexlmax)
 func (scheduleTaskService *ScheduleTaskService) UpdateScheduleTask(scheduleTask cfscan.ScheduleTask) (err error) {
@@ -130,11 +145,21 @@ func (scheduleTaskService *ScheduleTaskService) UpdateScheduleTask(scheduleTask 
 	}
 
 	if scheduleTask.Enable == "1" && scheduleTask.TaskStatus == "1" {
+		//marshall the payload json
+		var cronTaskPayload CronTaskPayload
+		err := json.Unmarshal([]byte(scheduleTask.TaskConfig), &cronTaskPayload)
+		if err != nil {
+			log.Printf(">>> Unmarshal json to struct failed: %v\n", err)
+		}
+		cronTaskPayload.SchedulerTaskID = strconv.Itoa(int(scheduleTask.ID))
+		cronTaskPayload.CronTaskStr = scheduleTask.CrontabStr
+		cronTaskPayloadStr, _ := json.Marshal(cronTaskPayload)
+		//查询出所有开启的schedule task 然后写入dynamic_cron.yml
 		newCronConf := Config{
 			CronId:      scheduleTask.ID,
 			Cronspec:    scheduleTask.CrontabStr,
 			TaskType:    typeDistributeCronASNScan,
-			TaskPayload: scheduleTask.TaskConfig,
+			TaskPayload: string(cronTaskPayloadStr),
 		}
 		err = cronManager.UpdateTaskByID(scheduleTask.ID, newCronConf)
 		if err != nil && strings.Contains(err.Error(), "not found") {

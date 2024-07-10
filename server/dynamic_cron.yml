@@ -1,46 +1,13 @@
 configs:
 - cronid: 1
-  cronspec: 0 9 * * *
+  cronspec: '* 2 * * *'
   task_type: cron-scan:cron-scan-asn
-  task_payload: |-
-    {
-            "scanDesc": "扫描AS906",
-            "scanType": "1",
-            "asnNumber": "AS906",
-            "ipbatchSize": 100000,
-            "enableTls": "1",
-            "scanPorts": "443",
-            "scanRate": 20000,
-            "ipcheckThread": 100,
-            "enableSpeedtest": "1",
-    }
+  task_payload: '{"scheduler_task_id":"1","cron_task_str":"* 2 * * *","scanDesc":"扫描AS906","scanType":"1","asnNumber":"AS906","ipbatchSize":100000,"enableTls":"1","scanPorts":"443","scanRate":20000,"ipcheckThread":100,"enableSpeedtest":"1"}'
 - cronid: 2
   cronspec: '* 10 * * *'
   task_type: cron-scan:cron-scan-asn
-  task_payload: |-
-    {
-            "scanDesc": "扫描31898",
-            "scanType": "1",
-            "asnNumber": "AS31898",
-            "ipbatchSize": 100000,
-            "enableTls": "1",
-            "scanPorts": "443",
-            "scanRate": 20000,
-            "ipcheckThread": 100,
-            "enableSpeedtest": "1",
-    }
+  task_payload: '{"scheduler_task_id":"2","cron_task_str":"* 10 * * *","scanDesc":"扫描31898","scanType":"1","asnNumber":"AS31898","ipbatchSize":100000,"enableTls":"1","scanPorts":"443","scanRate":20000,"ipcheckThread":100,"enableSpeedtest":"1"}'
 - cronid: 4
   cronspec: '* 10 * * *'
   task_type: cron-scan:cron-scan-asn
-  task_payload: |-
-    {
-            "scanDesc": "扫描AS51847",
-            "scanType": "1",
-            "asnNumber": "AS51847",
-            "ipbatchSize": 100000,
-            "enableTls": "1",
-            "scanPorts": "443",
-            "scanRate": 20000,
-            "ipcheckThread": 100,
-            "enableSpeedtest": "1",
-    }
+  task_payload: '{"scheduler_task_id":"4","cron_task_str":"* 10 * * *","scanDesc":"扫描AS51847","scanType":"1","asnNumber":"AS51847","ipbatchSize":100000,"enableTls":"1","scanPorts":"443","scanRate":20000,"ipcheckThread":100,"enableSpeedtest":"1"}'
