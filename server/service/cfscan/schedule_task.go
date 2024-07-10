@@ -29,6 +29,17 @@ func (scheduleTaskService *ScheduleTaskService) CreateScheduleTask(scheduleTask 
 	if scheduleTask.Enable != "0" || scheduleTask.TaskStatus != "0" {
 		return errors.New("新建定时任务的状态必须为禁用中和非开启状态")
 	}
+	var asnInfo cfscan.AsnInfo
+	//确保ASN编号 在数据库存在
+	tx := global.GVA_DB.Model(&cfscan.AsnInfo{}).Where("asn_name = ?", scheduleTask.AsnNumber).Find(&asnInfo)
+	if tx.Error != nil {
+		// 处理查询错误
+		return errors.New("查询ASNInfo信息失败")
+	}
+
+	if tx.RowsAffected == 0 {
+		return errors.New("请确保ASN编号存在数据库中")
+	}
 	//设置为1970 时间戳
 	unixEpoch := time.Unix(0, 0)
 	scheduleTask.LastRunAt = unixEpoch
