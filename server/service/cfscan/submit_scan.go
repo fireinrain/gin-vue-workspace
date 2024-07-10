@@ -2,12 +2,15 @@ package cfscan
 
 import (
 	"context"
+	"encoding/json"
 	tasks "github.com/endless-cfcdn/shared-tasks"
 	"github.com/flipped-aurora/gin-vue-admin/server/global"
 	"github.com/flipped-aurora/gin-vue-admin/server/model/cfscan"
 	cfscanReq "github.com/flipped-aurora/gin-vue-admin/server/model/cfscan/request"
 	cfscan_utils "github.com/flipped-aurora/gin-vue-admin/server/utils/cfscan"
+	"gorm.io/gorm/clause"
 	"log"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -180,7 +183,7 @@ func DoIPScanBackground(submitScan *cfscan.SubmitScan) error {
 					// ... (保持原有的结果处理逻辑不变)
 					//convert sub json list to big json
 					// 创建一个切片来存储去掉方括号的 JSON 对象
-					cleanResultJson, err2 := cfscan_utils.CleanResultJson(finalResult)
+					cleanResultJson, err2 := cfscan_utils.CleanResultJsonE(finalResult)
 					if err2 != nil {
 						log.Printf("Clean Result Json Error: %s", err2)
 						log.Println("Submit Task finished: Submit RecordID", newRecordId)
@@ -196,6 +199,37 @@ func DoIPScanBackground(submitScan *cfscan.SubmitScan) error {
 					err = global.GVA_DB.Model(&cfscan.SubmitScan{}).Where("id = ?", newRecordId).Updates(&sub).Error
 					if err != nil {
 						log.Printf("Error on update submit scan for result data: %s\n", err.Error())
+					}
+					//保存到反代IP数据库
+					var speedTestResultES []cfscan.SpeedTestResultE
+					err2 = json.Unmarshal([]byte(mergedJSON), &speedTestResultES)
+					if err != nil {
+						log.Printf("Error on unmarshal merged result json: %s\n", err.Error())
+					}
+					//append to proxy_ips
+					var proxy_ips []cfscan.ProxyIps
+					for _, r := range speedTestResultES {
+						enableTLS := "0"
+						if r.EnableTLS {
+							enableTLS = "1"
+						}
+						p := cfscan.ProxyIps{
+							AsnNumber:     r.AsnNumber,
+							Ip:            r.IP,
+							Port:          r.Port,
+							EnableTls:     enableTLS,
+							DataCenter:    r.DataCenter,
+							Region:        r.Region,
+							City:          r.City,
+							Latency:       r.Latency,
+							TcpDuration:   strconv.FormatInt(int64(r.TcpDuration), 10),
+							DownloadSpeed: r.DownloadSpeed,
+						}
+						proxy_ips = append(proxy_ips, p)
+					}
+					// 使用 ON CONFLICT DO NOTHING 跳过冲突的记录
+					if err := global.GVA_DB.Model(&cfscan.ProxyIps{}).Clauses(clause.OnConflict{DoNothing: true}).Create(&proxy_ips).Error; err != nil {
+						log.Println("Failed to insert asn scan result to proxy_ips:", err)
 					}
 					log.Println("Submit Task finished: Submit RecordID", newRecordId)
 					return
@@ -333,7 +367,7 @@ func DoASNScanBackground(submitScan *cfscan.SubmitScan) error {
 					// ... (保持原有的结果处理逻辑不变)
 					//convert sub json list to big json
 					// 创建一个切片来存储去掉方括号的 JSON 对象
-					cleanResultJson, err2 := cfscan_utils.CleanResultJson(finalResult)
+					cleanResultJson, err2 := cfscan_utils.CleanResultJsonE(finalResult)
 					if err2 != nil {
 						log.Printf("Clean Result Json Error: %s", err2)
 						log.Println("Submit Task finished: Submit RecordID", newRecordId)
@@ -350,7 +384,37 @@ func DoASNScanBackground(submitScan *cfscan.SubmitScan) error {
 					if err != nil {
 						log.Printf("Error on update submit scan for result data: %s\n", err.Error())
 					}
-
+					//保存到反代IP数据库
+					var speedTestResultES []cfscan.SpeedTestResultE
+					err2 = json.Unmarshal([]byte(mergedJSON), &speedTestResultES)
+					if err != nil {
+						log.Printf("Error on unmarshal merged result json: %s\n", err.Error())
+					}
+					//append to proxy_ips
+					var proxy_ips []cfscan.ProxyIps
+					for _, r := range speedTestResultES {
+						enableTLS := "0"
+						if r.EnableTLS {
+							enableTLS = "1"
+						}
+						p := cfscan.ProxyIps{
+							AsnNumber:     r.AsnNumber,
+							Ip:            r.IP,
+							Port:          r.Port,
+							EnableTls:     enableTLS,
+							DataCenter:    r.DataCenter,
+							Region:        r.Region,
+							City:          r.City,
+							Latency:       r.Latency,
+							TcpDuration:   strconv.FormatInt(int64(r.TcpDuration), 10),
+							DownloadSpeed: r.DownloadSpeed,
+						}
+						proxy_ips = append(proxy_ips, p)
+					}
+					// 使用 ON CONFLICT DO NOTHING 跳过冲突的记录
+					if err := global.GVA_DB.Model(&cfscan.ProxyIps{}).Clauses(clause.OnConflict{DoNothing: true}).Create(&proxy_ips).Error; err != nil {
+						log.Println("Failed to insert asn scan result to proxy_ips:", err)
+					}
 					log.Println("Submit Task finished: Submit RecordID", newRecordId)
 
 					return
@@ -495,7 +559,7 @@ func DoASNSScanBackground(submitScan *cfscan.SubmitScan) error {
 					// ... (保持原有的结果处理逻辑不变)
 					//convert sub json list to big json
 					// 创建一个切片来存储去掉方括号的 JSON 对象
-					cleanResultJson, err2 := cfscan_utils.CleanResultJson(finalResult)
+					cleanResultJson, err2 := cfscan_utils.CleanResultJsonE(finalResult)
 					if err2 != nil {
 						log.Printf("Clean Result Json Error: %s", err2)
 						log.Println("Submit Task finished: Submit RecordID", newRecordId)
@@ -512,7 +576,37 @@ func DoASNSScanBackground(submitScan *cfscan.SubmitScan) error {
 					if err != nil {
 						log.Printf("Error on update submit scan for result data: %s\n", err.Error())
 					}
-
+					//保存到反代IP数据库
+					var speedTestResultES []cfscan.SpeedTestResultE
+					err2 = json.Unmarshal([]byte(mergedJSON), &speedTestResultES)
+					if err != nil {
+						log.Printf("Error on unmarshal merged result json: %s\n", err.Error())
+					}
+					//append to proxy_ips
+					var proxy_ips []cfscan.ProxyIps
+					for _, r := range speedTestResultES {
+						enableTLS := "0"
+						if r.EnableTLS {
+							enableTLS = "1"
+						}
+						p := cfscan.ProxyIps{
+							AsnNumber:     r.AsnNumber,
+							Ip:            r.IP,
+							Port:          r.Port,
+							EnableTls:     enableTLS,
+							DataCenter:    r.DataCenter,
+							Region:        r.Region,
+							City:          r.City,
+							Latency:       r.Latency,
+							TcpDuration:   strconv.FormatInt(int64(r.TcpDuration), 10),
+							DownloadSpeed: r.DownloadSpeed,
+						}
+						proxy_ips = append(proxy_ips, p)
+					}
+					// 使用 ON CONFLICT DO NOTHING 跳过冲突的记录
+					if err := global.GVA_DB.Model(&cfscan.ProxyIps{}).Clauses(clause.OnConflict{DoNothing: true}).Create(&proxy_ips).Error; err != nil {
+						log.Println("Failed to insert asn scan result to proxy_ips:", err)
+					}
 					log.Println("Submit Task finished: Submit RecordID", newRecordId)
 
 					return

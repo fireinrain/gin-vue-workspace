@@ -272,6 +272,51 @@ func CleanResultJson(taskResults []string) (string, error) {
 
 }
 
+type CFIPTestResultE struct {
+	AsnNumber  string `json:"asn_number"`
+	IP         string `json:"ip"`          // IP地址
+	Port       int    `json:"port"`        // 端口
+	DataCenter string `json:"data_center"` // 数据中心
+	Region     string `json:"region"`      // 地区
+	City       string `json:"city"`        // 城市
+	//CF下载延迟
+	Latency string `json:"latency"` // 延迟
+	//CF代理判断延迟
+	TcpDuration   time.Duration `json:"tcp_duration"`   // TCP请求延迟
+	EnableTLS     bool          `json:"enable_tls"`     //是否开启TLS
+	DownloadSpeed string        `json:"download_speed"` // 下载速度
+}
+
+func CleanResultJsonE(taskResults []string) (string, error) {
+	//去除重复的IP
+	seenIPs := make(map[string]bool)
+	var uniqueRecords []CFIPTestResultE
+	for _, result := range taskResults {
+		var cfResult []CFIPTestResultE
+		err := json.Unmarshal([]byte(result), &cfResult)
+		if err != nil {
+			log.Printf("Error on unmarshall value: %s\n", result)
+			continue
+		}
+		//去重标准是 ip+端口
+		for _, r := range cfResult {
+			port := strconv.Itoa(r.Port)
+			if !seenIPs[r.IP+port] {
+				seenIPs[r.IP+port] = true
+				uniqueRecords = append(uniqueRecords, r)
+			}
+		}
+	}
+	//转化为json列表
+	marshal, err := json.Marshal(uniqueRecords)
+	if err != nil {
+		log.Printf("Error on marshall value: %v\n", uniqueRecords)
+		return "", err
+	}
+	return string(marshal), nil
+
+}
+
 const (
 	earthRadiusKm = 6371 // 地球平均半径（公里）
 	//深圳福田 北纬 东经

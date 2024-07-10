@@ -10,7 +10,7 @@ type ProxyIps struct {
 	global.GVA_MODEL
 	AsnNumber     string `json:"asnNumber" form:"asnNumber" gorm:"column:asn_number;comment:;"`             //ASN编号
 	Ip            string `json:"ip" form:"ip" gorm:"index;column:ip;comment:;"`                             //IP地址
-	Port          *int   `json:"port" form:"port" gorm:"index;column:port;comment:;"`                       //端口号
+	Port          int    `json:"port" form:"port" gorm:"index;column:port;comment:;"`                       //端口号
 	EnableTls     string `json:"enableTls" form:"enableTls" gorm:"column:enable_tls;comment:;"`             //开启TLS
 	DataCenter    string `json:"dataCenter" form:"dataCenter" gorm:"column:data_center;comment:;"`          //数据中心
 	Region        string `json:"region" form:"region" gorm:"column:region;comment:;"`                       //地区
