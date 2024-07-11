@@ -80,9 +80,9 @@
         <el-table-column type="selection" width="55" />
 
         <el-table-column sortable align="left" label="ID" prop="ID" width="90" />
-        <el-table-column sortable align="left" label="ASN编号" prop="asnNumber" width="120" />
-        <el-table-column sortable align="left" label="IP地址" prop="ip" width="120" />
-        <el-table-column sortable align="left" label="端口号" prop="port" width="120" />
+          <el-table-column sortable align="left" label="ASN编号" prop="asnNumber" width="110"/>
+          <el-table-column sortable align="left" label="IP地址" prop="ip" width="130"/>
+          <el-table-column sortable align="left" label="端口号" prop="port" width="90"/>
         <el-table-column sortable align="left" label="开启TLS" prop="enableTls" width="120">
             <template #default="scope">
             {{ filterDict(scope.row.enableTls,TLSDisplayEnableOptions) }}
