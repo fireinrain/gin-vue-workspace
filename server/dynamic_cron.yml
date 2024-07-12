@@ -1,5 +1,1 @@
-configs:
-- cronid: 1
-  cronspec: '*/3 * * * *'
-  task_type: cron-scan:cron-scan-asn
-  task_payload: '{"scheduler_task_id":"1","cron_task_str":"*/3 * * * *","scanDesc":"扫描AS906","scanType":"1","asnNumber":"AS906","ipbatchSize":100000,"enableTls":"1","scanPorts":"443","scanRate":20000,"ipcheckThread":100,"enableSpeedtest":"1"}'
+configs: [ ]
