@@ -6,4 +6,5 @@ type ServiceGroup struct {
 	ScheduleTaskService
 	ScheduleTaskHistService
 	ProxyIpsService
+	AliveProxyIpsService
 }

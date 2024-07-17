@@ -6,4 +6,5 @@ type ApiGroup struct {
 	ScheduleTaskApi
 	ScheduleTaskHistApi
 	ProxyIpsApi
+	AliveProxyIpsApi
 }

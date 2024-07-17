@@ -6,4 +6,5 @@ type RouterGroup struct {
 	ScheduleTaskRouter
 	ScheduleTaskHistRouter
 	ProxyIpsRouter
+	AliveProxyIpsRouter
 }

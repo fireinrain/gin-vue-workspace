@@ -147,13 +147,13 @@ Create INDEX idx_ip ON  proxy_ips(ip,port);
 -- 经过检测的IP代理池
 -- 从proxy_ips 查询出来检测更新
 
-create table alived_proxy_ips(
+create table alive_proxy_ips(
      asn_number TEXT, --asn 名称
      asn_desc TEXT, --asn描述
      ip TEXT, --ip
      port INTEGER, --端口
      enable_tls BOOLEAN, --是否开启tls
-     geo_distance INTEGER --物理距离
+     geo_distance INTEGER, --物理距离
      data_center TEXT, -- 数据中心
      region TEXT, --区域
      city TEXT, --城市
@@ -161,11 +161,50 @@ create table alived_proxy_ips(
      tcp_duration INTEGER, --TCP延迟
      download_speed TEXT, --下载速度
      ttl INTEGER, --存活时间
-     desc TEXT --ip描述
+     desc_str TEXT --ip描述
 );
 
 -- 添加联合唯一索引
-CREATE UNIQUE INDEX idx_ip_port ON alived_proxy_ips (ip, port);
-Create INDEX idx_ip ON  alived_proxy_ips(ip,port);
+CREATE UNIQUE INDEX idx_ip_port ON alive_proxy_ips (ip, port);
+Create INDEX idx_ip ON  alive_proxy_ips(ip,port);
+
+
+-- 查询得到统计数据 然后插入统计表
+SELECT
+    CURRENT_DATE AS date,
+    COUNT(DISTINCT asn_number) AS asn_number_count,
+    COUNT(DISTINCT ip) AS daily_ip_count,
+    COUNT(DISTINCT port) AS distinct_port_count,
+    COUNT(DISTINCT data_center) AS distinct_data_center_count,
+    COUNT(DISTINCT city) AS distinct_city_count,
+    SUM(CASE WHEN enable_tls = TRUE THEN 1 ELSE 0 END) AS tls_enabled_count,
+    SUM(CASE WHEN enable_tls = FALSE THEN 1 ELSE 0 END) AS tls_disabled_count
+FROM
+    proxy_ips;
+
+SELECT
+            CURRENT_DATE AS date,
+            COUNT(DISTINCT asn_number) AS asn_number_count,
+            COUNT(DISTINCT ip) AS daily_ip_count,
+            COUNT(DISTINCT port) AS distinct_port_count,
+            COUNT(DISTINCT data_center) AS distinct_data_center_count,
+            COUNT(DISTINCT city) AS distinct_city_count,
+            SUM(CASE WHEN enable_tls = TRUE THEN 1 ELSE 0 END) AS tls_enabled_count,
+            SUM(CASE WHEN enable_tls = FALSE THEN 1 ELSE 0 END) AS tls_disabled_count
+FROM
+    alive_proxy_ips;
+
+-- 统计表 用来统计proxy_ips 和alive_proxy_ips
+CREATE TABLE daily_proxy_stats (
+   date DATE,                   -- 统计日期，作为主键
+   asn_number_count INTEGER ,       -- 不同 ASN 数量
+   daily_ip_count INTEGER ,         -- 每日不同 IP 数量
+   distinct_port_count INTEGER ,    -- 不同端口数量
+   distinct_data_center_count INTEGER , -- 不同数据中心数量
+   distinct_city_count INTEGER ,    -- 不同城市数量
+   tls_enabled_count INTEGER,      -- 启用 TLS 的 IP 数量
+   tls_disabled_count INTEGER,      -- 未启用 TLS 的 IP 数量
+   stats_from_alive BOOLEAN       --是否是alive_proxy_ip的数据
+);
 
 
