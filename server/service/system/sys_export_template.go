@@ -21,6 +21,8 @@ import (
 type SysExportTemplateService struct {
 }
 
+var SysExportTemplateServiceApp = new(SysExportTemplateService)
+
 // CreateSysExportTemplate 创建导出模板记录
 // Author [piexlmax](https://github.com/piexlmax)
 func (sysExportTemplateService *SysExportTemplateService) CreateSysExportTemplate(sysExportTemplate *system.SysExportTemplate) (err error) {
@@ -151,10 +153,13 @@ func (sysExportTemplateService *SysExportTemplateService) ExportExcel(templateID
 		return nil, "", err
 	}
 	var tableTitle []string
+	var selectKeyFmt []string
 	for _, key := range columns {
+		selectKeyFmt = append(selectKeyFmt, fmt.Sprintf("`%s`", key))
 		tableTitle = append(tableTitle, templateInfoMap[key])
 	}
-	selects := strings.Join(columns, ", ")
+
+	selects := strings.Join(selectKeyFmt, ", ")
 	var tableMap []map[string]interface{}
 	db := global.GVA_DB
 	if template.DBName != "" {
@@ -248,7 +253,7 @@ func (sysExportTemplateService *SysExportTemplateService) ExportExcel(templateID
 	}
 	var rows [][]string
 	rows = append(rows, tableTitle)
-	for _, table := range tableMap {
+	for _, exTable := range tableMap {
 		var row []string
 		for _, column := range columns {
 			if len(template.JoinTemplate) > 0 {
@@ -262,15 +267,20 @@ func (sysExportTemplateService *SysExportTemplateService) ExportExcel(templateID
 					}
 				}
 			}
-			row = append(row, fmt.Sprintf("%v", table[column]))
+			// 需要对时间类型特殊处理
+			if t, ok := exTable[column].(time.Time); ok {
+				row = append(row, t.Format("2006-01-02 15:04:05"))
+			} else {
+				row = append(row, fmt.Sprintf("%v", exTable[column]))
+			}
 		}
 		rows = append(rows, row)
 	}
 	for i, row := range rows {
 		for j, colCell := range row {
-			err := f.SetCellValue("Sheet1", fmt.Sprintf("%s%d", getColumnName(j+1), i+1), colCell)
-			if err != nil {
-				return nil, "", err
+			sErr := f.SetCellValue("Sheet1", fmt.Sprintf("%s%d", getColumnName(j+1), i+1), colCell)
+			if sErr != nil {
+				return nil, "", sErr
 			}
 		}
 	}
